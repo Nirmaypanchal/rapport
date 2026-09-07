@@ -67,17 +67,33 @@ class PersonPatch(BaseModel):
     color: str | None = None
 
 
-def create_app(library: Library, db: Database, importer: Importer, worker: Worker, recorder) -> FastAPI:
+def create_app(library: Library, db: Database, importer: Importer, worker: Worker, recorder, token: str | None = None) -> FastAPI:
     app = FastAPI(title="DJI Mic Library")
     # The Next.js dev server (localhost:3000) talks to this API directly; the exported build is same-origin.
     from fastapi.middleware.cors import CORSMiddleware
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+        allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "tauri://localhost", "http://tauri.localhost"],
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.get("/api/health")
+    def health():
+        return {"ok": True}
+
+    if token:
+        from starlette.responses import JSONResponse as _JR
+
+        @app.middleware("http")
+        async def require_token(request, call_next):
+            if request.url.path.startswith("/api/") and request.url.path != "/api/health":
+                auth = request.headers.get("authorization", "")
+                supplied = auth[7:] if auth.lower().startswith("bearer ") else request.query_params.get("token", "")
+                if supplied != token:
+                    return _JR({"detail": "unauthorized"}, status_code=401)
+            return await call_next(request)
 
     # ---- status ------------------------------------------------------------
     @app.get("/api/status")

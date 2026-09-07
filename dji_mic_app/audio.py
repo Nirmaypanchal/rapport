@@ -8,6 +8,8 @@ from pathlib import Path
 
 import numpy as np
 
+from .binaries import ffmpeg, ffprobe
+
 
 def sha256_file(path: Path, chunk: int = 4 * 1024 * 1024) -> str:
     h = hashlib.sha256()
@@ -23,7 +25,7 @@ def sha256_file(path: Path, chunk: int = 4 * 1024 * 1024) -> str:
 def probe(path: Path) -> dict:
     out = subprocess.run(
         [
-            "ffprobe", "-v", "error", "-select_streams", "a:0",
+            ffprobe(), "-v", "error", "-select_streams", "a:0",
             "-show_entries", "format=duration,size:stream=codec_name,sample_rate,channels",
             "-of", "json", str(path),
         ],
@@ -46,7 +48,7 @@ def to_wav16k(src: Path, dst: Path) -> Path:
     if dst.exists() and dst.stat().st_size > 44:
         return dst
     subprocess.run(
-        ["ffmpeg", "-y", "-v", "error", "-i", str(src), "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", str(dst)],
+        [ffmpeg(), "-y", "-v", "error", "-i", str(src), "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", str(dst)],
         check=True, capture_output=True,
     )
     return dst
@@ -57,7 +59,7 @@ def to_playback(src: Path, dst: Path) -> Path:
     if dst.exists() and dst.stat().st_size > 0:
         return dst
     subprocess.run(
-        ["ffmpeg", "-y", "-v", "error", "-i", str(src), "-ac", "1", "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", str(dst)],
+        [ffmpeg(), "-y", "-v", "error", "-i", str(src), "-ac", "1", "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", str(dst)],
         check=True, capture_output=True,
     )
     return dst
@@ -117,7 +119,7 @@ def export_condensed(src: Path, dst: Path, keep: list[tuple[float, float]]) -> P
     expr = "+".join(f"between(t,{s},{e})" for s, e in keep)
     filt = f"aselect='{expr}',asetpts=N/SR/TB"
     subprocess.run(
-        ["ffmpeg", "-y", "-v", "error", "-i", str(src), "-af", filt, "-ac", "1", "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", str(dst)],
+        [ffmpeg(), "-y", "-v", "error", "-i", str(src), "-af", filt, "-ac", "1", "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", str(dst)],
         check=True, capture_output=True,
     )
     return dst

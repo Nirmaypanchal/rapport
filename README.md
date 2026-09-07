@@ -95,6 +95,19 @@ and processed here; transcripts from other apps are imported as text (no player,
 Integrations are read-only and sync every 10 minutes when a key is present; nothing is written back.
 Keys live in `settings.json` inside the library folder and never leave the Mac except to call that one service.
 
+## Desktop app (in progress)
+
+The macOS app is a Tauri 2 shell around a frozen copy of this backend. Step one is done:
+
+```bash
+./desktop/sidecar/build.sh     # PyInstaller one-dir bundle -> desktop/sidecar/dist/rapport-core/
+desktop/sidecar/dist/rapport-core/rapport-core --library ~/Rapport --token SECRET
+```
+
+The sidecar prints `READY <port>` once the API answers, requires the token on every request,
+and carries static ffmpeg/ffprobe in `bin/` so a clean Mac needs no Homebrew. Models still download
+from Hugging Face on first run. Next steps: the Tauri shell, signing and notarization, DMG.
+
 ## Landing page
 
 `site/index.html` is the Rapport landing page, a single self-contained file. It deploys to

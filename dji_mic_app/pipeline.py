@@ -200,7 +200,7 @@ class Worker:
             self.models.speech_map(cache, samples)
 
             self._stage(rid, f"transcribing ({s.whisper_model.split('/')[-1]})")
-            tr = transcribe(wav, s.whisper_model, s.language)
+            tr = transcribe(samples, s.whisper_model, s.language)
 
             self._stage(rid, "finding speakers")
             diarizer_name = "none"

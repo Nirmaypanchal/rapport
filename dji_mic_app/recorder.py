@@ -10,11 +10,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from .binaries import ffmpeg
+
 
 def list_inputs() -> list[str]:
     """Names of audio input devices as avfoundation sees them."""
     try:
-        out = subprocess.run(["ffmpeg", "-hide_banner", "-f", "avfoundation", "-list_devices", "true", "-i", ""], capture_output=True, text=True, timeout=10).stderr
+        out = subprocess.run([ffmpeg(), "-hide_banner", "-f", "avfoundation", "-list_devices", "true", "-i", ""], capture_output=True, text=True, timeout=10).stderr
     except Exception:
         return []
     names: list[str] = []
@@ -53,7 +55,7 @@ class Recorder:
                 raise RuntimeError("already recording")
             ts = datetime.now()
             path = self.tmp_dir / f"REC_{ts:%Y%m%d_%H%M%S}.wav"
-            cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "avfoundation", "-i", f":{device}", "-ac", "1", "-ar", "48000", "-c:a", "pcm_s16le", str(path)]
+            cmd = [ffmpeg(), "-hide_banner", "-loglevel", "error", "-y", "-f", "avfoundation", "-i", f":{device}", "-ac", "1", "-ar", "48000", "-c:a", "pcm_s16le", str(path)]
             proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
             time.sleep(0.8)
             if proc.poll() is not None:

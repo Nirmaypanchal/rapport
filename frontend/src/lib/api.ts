@@ -1,5 +1,17 @@
 /* Typed client for the Python API. In production the app is served by that server, so the base is "". */
-export const API = process.env.NEXT_PUBLIC_API_BASE ?? "";
+export const API = (typeof window !== "undefined" && (window as unknown as { __RAPPORT_API__?: string }).__RAPPORT_API__) || process.env.NEXT_PUBLIC_API_BASE || "";
+
+/** The desktop shell passes a per-launch token as ?token=…; it is kept for the session and sent with every call. */
+function readToken(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    const fromUrl = new URLSearchParams(window.location.search).get("token");
+    if (fromUrl) { sessionStorage.setItem("rapportToken", fromUrl); return fromUrl; }
+    return sessionStorage.getItem("rapportToken") ?? "";
+  } catch { return ""; }
+}
+export const TOKEN = readToken();
+const withToken = (url: string) => (TOKEN ? `${url}${url.includes("?") ? "&" : "?"}token=${encodeURIComponent(TOKEN)}` : url);
 
 export type Word = [string, number, number];
 
@@ -126,7 +138,7 @@ export type VoiceMemosStatus = { available: boolean; reason: "permission" | "not
 export async function uploadFiles(files: File[]): Promise<{ imported: number[]; skipped: string[] }> {
   const fd = new FormData();
   for (const f of files) fd.append("files", f, f.name);
-  const res = await fetch(API + "/api/import/upload", { method: "POST", body: fd });
+  const res = await fetch(API + "/api/import/upload", { method: "POST", body: fd, headers: TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {} });
   if (!res.ok) throw new ApiError(res.status, await res.text());
   return res.json();
 }
@@ -169,7 +181,7 @@ export async function api<T>(path: string, init?: RequestInit & { json?: unknown
   const { json, ...rest } = init ?? {};
   const res = await fetch(API + path, {
     ...rest,
-    headers: { "Content-Type": "application/json", ...(rest.headers ?? {}) },
+    headers: { "Content-Type": "application/json", ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}), ...(rest.headers ?? {}) },
     body: json !== undefined ? JSON.stringify(json) : rest.body,
   });
   if (!res.ok) {
@@ -189,8 +201,8 @@ export async function api<T>(path: string, init?: RequestInit & { json?: unknown
 export const fetcher = <T,>(path: string) => api<T>(path);
 
 export const urls = {
-  audio: (id: number) => `${API}/api/recordings/${id}/audio`,
-  original: (id: number) => `${API}/api/recordings/${id}/original`,
-  transcript: (id: number) => `${API}/api/recordings/${id}/transcript.txt`,
-  condensed: (id: number, minGap: number, pad: number) => `${API}/api/recordings/${id}/condensed?min_gap=${minGap}&pad=${pad}`,
+  audio: (id: number) => withToken(`${API}/api/recordings/${id}/audio`),
+  original: (id: number) => withToken(`${API}/api/recordings/${id}/original`),
+  transcript: (id: number) => withToken(`${API}/api/recordings/${id}/transcript.txt`),
+  condensed: (id: number, minGap: number, pad: number) => withToken(`${API}/api/recordings/${id}/condensed?min_gap=${minGap}&pad=${pad}`),
 };

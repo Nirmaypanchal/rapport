@@ -4,14 +4,15 @@ from __future__ import annotations
 from pathlib import Path
 
 
-def transcribe(wav16k: Path, model: str, language: str | None = None) -> dict:
+def transcribe(audio, model: str, language: str | None = None) -> dict:
+    """`audio` is a 16 kHz float32 numpy array (or a path; arrays avoid Whisper shelling out to ffmpeg)."""
     import mlx_whisper
 
     opts = {}
     if language:
         opts["language"] = language
     result = mlx_whisper.transcribe(
-        str(wav16k),
+        audio if not isinstance(audio, Path) else str(audio),
         path_or_hf_repo=model,
         word_timestamps=True,
         condition_on_previous_text=False,  # fewer repetition loops on long files

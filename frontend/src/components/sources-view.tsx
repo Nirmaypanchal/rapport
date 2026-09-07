@@ -4,7 +4,7 @@ import useSWR from "swr";
 import { toast } from "sonner";
 import { siApple, siBluetooth, siDji, siDropbox, siGoogledrive, siIcloud, siNotion } from "simple-icons";
 import { ChevronRight, Circle, Download, FolderOpen, HardDrive, Mic, Square, Upload, Watch } from "lucide-react";
-import { API, api, fetcher, uploadFiles, type Settings, type Sources, type VoiceMemosStatus } from "@/lib/api";
+import { API, TOKEN, api, fetcher, uploadFiles, type Settings, type Sources, type VoiceMemosStatus } from "@/lib/api";
 import { fmtClock, fmtDate, fmtDur, fmtTime } from "@/lib/format";
 import { useStatus } from "@/lib/use-status";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 /* ---------------------------------------------------------------- brand marks */
 type Mark = { kind: "si"; path: string; hex: string } | { kind: "img"; src: string; fallback?: Mark } | { kind: "icon"; icon: React.ComponentType<{ className?: string; strokeWidth?: number }> };
 const si = (i: { path: string; hex: string }): Mark => ({ kind: "si", path: i.path, hex: `#${i.hex}` });
-const app = (key: string, fallback?: Mark): Mark => ({ kind: "img", src: `${API}/api/brand/${key}.png`, fallback });
+const app = (key: string, fallback?: Mark): Mark => ({ kind: "img", src: `${API}/api/brand/${key}.png${TOKEN ? `?token=${encodeURIComponent(TOKEN)}` : ""}`, fallback });
 const file = (name: string, fallback?: Mark): Mark => ({ kind: "img", src: `/brands/${name}`, fallback });
 
 function BrandMark({ mark, size = 44 }: { mark: Mark; size?: number }) {
