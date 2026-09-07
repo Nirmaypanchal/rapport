@@ -245,7 +245,7 @@ class Worker:
                 names.append(p["name"] if p else sp["label"])
             self.db.log(f"Processed {rec['original_name']} in {time.time() - t0:.0f}s: {len(segments)} turns, speakers: {', '.join(names)}")
             if s.auto_summarize and segments:
-                self.summarize_later(rid)
+                self.db.update_recording(rid, summary_status="queued", summary_error=None)
         except Exception as e:
             log.error("processing failed: %s", traceback.format_exc())
             self.db.update_recording(rid, status="error", stage=None, error=f"{type(e).__name__}: {e}")
@@ -268,6 +268,17 @@ class Worker:
         self.db.update_recording(rid, summary_status="queued", summary_error=None)
         threading.Thread(target=self._summarize, args=(rid, target), name=f"summary-{rid}", daemon=True).start()
         return True
+
+    def summarize_now(self, rid: int) -> None:
+        """Run a queued summary in this (worker) process."""
+        from .summarize import resolve_provider
+
+        s = self.library.settings
+        target = resolve_provider(s.summary_provider, s.summary_model or None)
+        if target is None:
+            self.db.update_recording(rid, summary_status="error", summary_error="No local model available (start Ollama or choose MLX in Settings).")
+            return
+        self._summarize(rid, target)
 
     def _summarize(self, rid: int, target: tuple[str, str]) -> None:
         from .summarize import summarize

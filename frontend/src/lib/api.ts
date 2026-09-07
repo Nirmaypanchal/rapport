@@ -132,7 +132,7 @@ export type Sources = {
 };
 
 export type VoiceMemo = { uid: string; title: string; recorded_at: string | null; duration_sec: number | null; path: string; size_bytes: number; imported: boolean };
-export type VoiceMemosStatus = { available: boolean; reason: "permission" | "not_found" | "error" | null; message: string | null; python: string; memos: VoiceMemo[] };
+export type VoiceMemosStatus = { available: boolean; reason: "permission" | "not_found" | "error" | null; message: string | null; python: string; memos: VoiceMemo[]; app_name?: string; app_path?: string | null; in_app?: boolean };
 
 /** Multipart upload of audio files; they are copied into the library and queued. */
 export async function uploadFiles(files: File[]): Promise<{ imported: number[]; skipped: string[] }> {

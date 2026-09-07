@@ -46,7 +46,7 @@ type SourceId = "dji" | "usb" | "mic" | "voicememos" | "omi" | "granola" | "noti
 type Tile = { id: SourceId; name: string; mark: Mark; blurb: string };
 
 const DEVICES: Tile[] = [
-  { id: "dji", name: "DJI Mic", mark: si(siDji), blurb: "Transmitters over USB. Verified, then cleared." },
+  { id: "dji", name: "DJI Mic", mark: si(siDji), blurb: "Transmitters over USB. New recordings are copied in." },
   { id: "usb", name: "USB recorder or SD card", mark: { kind: "icon", icon: HardDrive }, blurb: "Zoom, Tascam, Sony, any drive with audio." },
   { id: "mic", name: "Microphone & Bluetooth", mark: si(siBluetooth), blurb: "Record from AirPods, a USB mic, or the Mac." },
   { id: "voicememos", name: "Apple Voice Memos", mark: app("voicememos", si(siApple)), blurb: "Mac, iPhone and Apple Watch memos via iCloud." },
@@ -170,10 +170,10 @@ function DjiPanel({ src, count }: { src: Sources; count: number }) {
       {vols.length ? vols.map((v) => <div key={v.mount} className="mb-2 flex items-center gap-2 rounded-md border border-hairline px-3 py-2"><Pill tone="good">connected</Pill><span className="font-medium">{v.media || v.name}</span><span className="tc ml-auto text-[12px] text-ink-3">{v.files} file{v.files === 1 ? "" : "s"} waiting</span></div>) : <p className="text-ink-2">No transmitter is plugged in right now.</p>}
       <Steps items={[
         <>Plug a transmitter (or the charging case) into the Mac with USB-C. It shows up as a drive named <span className="tc">NO NAME</span>.</>,
-        <>Every recording is copied, verified byte-for-byte, transcribed, and then deleted from the transmitter so it never fills up.</>,
+        <>New recordings are copied, verified byte-for-byte and transcribed. Anything already in the library is skipped, and nothing is deleted from the transmitter unless you turn that on in Settings.</>,
         <>Unplug whenever the light in the sidebar is green. Nothing else to do.</>,
       ]} />
-      <div className="mt-4 text-[12px] text-ink-3">{count} recordings so far. Deleting after import can be turned off in Settings.</div>
+      <div className="mt-4 text-[12px] text-ink-3">{count} recordings so far. Clearing the mic after import is off by default; Settings has the switch.</div>
     </div>
   );
 }
@@ -223,23 +223,34 @@ function MicPanel({ src, onChange }: { src: Sources; onChange: () => void }) {
 }
 
 function VoiceMemosPanel({ vm, auto, onAuto, onChange, onRecheck }: { vm: Omit<VoiceMemosStatus, "memos">; auto: boolean; onAuto: (v: boolean) => void; onChange: () => void; onRecheck: () => void }) {
-  const { data: full, mutate } = useSWR<VoiceMemosStatus>(vm.available ? "/api/voicememos" : null, fetcher, { refreshInterval: 20000 });
+  // While access is missing, poll every 3 s: each attempt is also what registers the app in the Full Disk Access list,
+  // and the panel flips to "connected" the moment the user switches Rapport on.
+  const { data: live, mutate } = useSWR<VoiceMemosStatus>("/api/voicememos", fetcher, { refreshInterval: vm.available ? 20000 : 3000 });
   const [busy, setBusy] = useState(false);
-  if (!vm.available) {
-    if (vm.reason !== "permission") return <p className="text-ink-2">{vm.message}</p>;
+  const [waiting, setWaiting] = useState(false);
+  const appName = live?.app_name ?? vm.app_name ?? "Rapport";
+  const inApp = live?.in_app ?? vm.in_app ?? false;
+  const available = live ? live.available : vm.available;
+  useEffect(() => { if (available && waiting) { setWaiting(false); toast("Voice Memos connected"); onRecheck(); } }, [available, waiting, onRecheck]);
+  if (!available) {
+    if ((live?.reason ?? vm.reason) !== "permission") return <p className="text-ink-2">{live?.message ?? vm.message}</p>;
     return (
       <div>
-        <p className="text-ink-2">Voice Memos keeps its recordings in a folder macOS protects. Grant access once and memos from this Mac, your iPhone and Apple Watch (via iCloud) import with their titles and dates. Voice Memos itself is never changed.</p>
+        <p className="text-ink-2">macOS keeps Voice Memos in a protected folder and has no permission just for it, so {appName} needs <b>Full Disk Access</b>. It's a one-time switch. {appName} only reads the memos; Voice Memos itself is never changed.</p>
         <Steps items={[
-          <div className="flex flex-wrap items-center gap-2"><Button size="sm" onClick={() => openSys("fulldisk")}>Request access</Button><span className="text-ink-2">opens System Settings at Full Disk Access.</span></div>,
-          <div className="flex flex-wrap items-center gap-2"><Button size="sm" variant="outline" onClick={() => openSys("reveal-python")}>Show the app to add</Button><span className="text-ink-2">reveals it in Finder. Drag it into the list, or use <b>+</b>, and switch it on. Adding Terminal instead also works if you start from there.</span></div>,
-          <div className="flex flex-wrap items-center gap-2"><Button size="sm" variant="outline" onClick={onRecheck}>Check again</Button><span className="text-ink-2">after restarting the app.</span></div>,
+          <div key="1" className="flex flex-wrap items-center gap-2"><Button size="sm" onClick={() => { setWaiting(true); openSys("fulldisk"); mutate(); }}>Allow access</Button><span className="text-ink-2">opens System Settings at Full Disk Access.</span></div>,
+          <span key="2" className="text-ink-2">Find <b>{appName}</b> in the list and switch it on.{inApp ? "" : " If it isn't listed, click + and add it."}</span>,
         ]} />
-        <div className="mt-4 text-[12px] text-ink-3">Meanwhile: drag any memo out of the Voice Memos window onto the Recordings list.</div>
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-[12.5px]">
+          {waiting ? <><Pill tone="live">waiting for the switch</Pill><span className="text-ink-3">This panel updates on its own once it's on.</span></> : <Button size="sm" variant="ghost" onClick={() => mutate()}>Check again</Button>}
+          {inApp && <Button size="sm" variant="ghost" onClick={() => openSys("reveal-app")}>Show {appName} in Finder</Button>}
+        </div>
+        {!inApp && <div className="mt-3 text-[12px] text-ink-3">You're running the development server, so macOS attributes access to the app that launched it (Terminal or Python) rather than Rapport. The packaged app asks as itself.</div>}
+        <div className="mt-3 text-[12px] text-ink-3">No access at all? Drag any memo out of the Voice Memos window onto the Recordings list.</div>
       </div>
     );
   }
-  const fresh = full?.memos.filter((m) => !m.imported) ?? [];
+  const fresh = live?.memos.filter((m) => !m.imported) ?? [];
   return (
     <div>
       <div className="flex flex-wrap items-center gap-2">

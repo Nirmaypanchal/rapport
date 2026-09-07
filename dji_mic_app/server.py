@@ -13,7 +13,6 @@ from pydantic import BaseModel
 from .config import Library
 from .db import Database
 from .importer import Importer
-from .pipeline import Worker
 from .speakers import next_color
 from .dji import AUDIO_EXT
 
@@ -68,7 +67,7 @@ class PersonPatch(BaseModel):
     color: str | None = None
 
 
-def create_app(library: Library, db: Database, importer: Importer, worker: Worker, recorder, token: str | None = None) -> FastAPI:
+def create_app(library: Library, db: Database, importer: Importer, worker, recorder, token: str | None = None) -> FastAPI:
     app = FastAPI(title="DJI Mic Library")
     # The Next.js dev server (localhost:3000) talks to this API directly; the exported build is same-origin.
     from fastapi.middleware.cors import CORSMiddleware
@@ -212,7 +211,8 @@ def create_app(library: Library, db: Database, importer: Importer, worker: Worke
             "fulldisk": ["open", "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"],
             "microphone": ["open", "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"],
             "bluetooth": ["open", "x-apple.systempreferences:com.apple.BluetoothSettings"],
-            "reveal-python": ["open", "-R", python_executable()],
+            "reveal-app": ["open", "-R", os.environ.get("RAPPORT_APP_PATH") or python_executable()],
+            "reveal-python": ["open", "-R", os.environ.get("RAPPORT_APP_PATH") or python_executable()],
             "voicememos-app": ["open", "-a", "Voice Memos"],
         }
         if body.target.startswith("reveal:"):
@@ -329,7 +329,12 @@ def create_app(library: Library, db: Database, importer: Importer, worker: Worke
     # ---- Apple Voice Memos -------------------------------------------------
     @app.get("/api/voicememos")
     def voicememos():
-        return importer.voice_memos()
+        """Listing doubles as the access probe: a denied read is what makes macOS list the app under Full Disk Access."""
+        d = importer.voice_memos()
+        d["app_name"] = os.environ.get("RAPPORT_APP_NAME") or "this app"
+        d["app_path"] = os.environ.get("RAPPORT_APP_PATH")
+        d["in_app"] = bool(os.environ.get("RAPPORT_APP_PATH"))
+        return d
 
     @app.post("/api/voicememos/import")
     def voicememos_import(body: VoiceMemoImport):

@@ -9,7 +9,7 @@ import uvicorn
 from .config import DEFAULT_LIBRARY, Library
 from .db import Database
 from .importer import Importer
-from .pipeline import Worker
+from .workerproc import WorkerSupervisor
 from .recorder import Recorder
 from .server import create_app
 
@@ -22,7 +22,7 @@ def main() -> None:
     library = Library(DEFAULT_LIBRARY)
     db = Database(library.db_path)
     importer = Importer(library, db)
-    worker = Worker(library, db)
+    worker = WorkerSupervisor(library, db)
     recorder = Recorder(library.cache_dir / "_recording")
     importer.on_transcripts_imported = lambda ids: [worker.summarize_later(r) for r in ids if library.settings.auto_summarize and not db.get_recording(r).get("summary")]
     app = create_app(library, db, importer, worker, recorder)
@@ -43,4 +43,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    import multiprocessing
+
+    multiprocessing.freeze_support()
     main()

@@ -78,7 +78,7 @@ export function SettingsView() {
         <div className="eyebrow mt-6 mb-2">Settings</div>
         <div className="rounded-lg border border-hairline bg-surface px-4 py-1">
           <Row label="Auto-import from mic"><Switch checked={s.auto_import} onCheckedChange={(v) => set("auto_import", v)} /></Row>
-          <Row label="Delete from mic after import" help="Only after the copy is verified byte-for-byte (SHA-256)."><Switch checked={s.delete_from_device_after_import} onCheckedChange={(v) => set("delete_from_device_after_import", v)} /></Row>
+          <Row label="Clear the mic after import" help="Off by default: recordings are copied and the transmitter is left alone. When on, a file is deleted only after its copy is verified byte-for-byte."><Switch checked={s.delete_from_device_after_import} onCheckedChange={(v) => set("delete_from_device_after_import", v)} /></Row>
           <Row label="Whisper model" help="Downloaded once from Hugging Face; everything runs on this Mac.">
             <Select value={s.whisper_model} onValueChange={(v) => v && set("whisper_model", v)}><SelectTrigger className="max-w-[360px] bg-surface"><SelectValue /></SelectTrigger><SelectContent>{WHISPER.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent></Select>
           </Row>

@@ -3,9 +3,9 @@
 A local Mac app that gathers every voice recording you make (DJI Mic, any USB recorder, a microphone,
 Voice Memos, Omi, Granola, Notion…) into one searchable library. Plug a DJI transmitter in and it will:
 
-1. **Import** every recording from the mic into `~/DJI Mic Library/audio/YYYY/YYYY-MM-DD/`,
-   verify the copy byte-for-byte (SHA-256), and then delete it from the mic so the
-   transmitter never fills up. The originals in the library are never modified.
+1. **Import** every new recording from the mic into `~/DJI Mic Library/audio/YYYY/YYYY-MM-DD/`
+   and verify the copy byte-for-byte (SHA-256). Files already in the library are skipped by hash, and the
+   mic is never cleared unless you switch that on in Settings. The originals in the library are never modified.
 2. **Transcribe** it on-device with Whisper (`mlx-whisper`, Apple silicon GPU), with word timestamps.
 3. **Find the speakers** (who spoke when) and compute a voice embedding for each one.
 4. **Recognise people across recordings**: a new voice becomes "Speaker N"; rename it once
@@ -82,7 +82,7 @@ and processed here; transcripts from other apps are imported as text (no player,
 
 | Source | How |
 |---|---|
-| DJI Mic transmitters | Plug in over USB. Detected, verified, cleared from the mic. |
+| DJI Mic transmitters | Plug in over USB. New files detected, copied, verified. |
 | Any USB recorder, SD card, drive | Plug in and switch it on in Sources. Copied from, never deleted. |
 | Microphone, Bluetooth mic, AirPods, iPhone (Continuity) | Pick the input and press Record. Saved as 48 kHz WAV. |
 | Apple Voice Memos, iPhone, Apple Watch | Grant Full Disk Access once; memos (including those synced through iCloud) are imported with titles and dates. |

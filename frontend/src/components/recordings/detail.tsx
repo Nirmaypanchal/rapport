@@ -67,7 +67,7 @@ export function RecordingDetail({ id, seekTo, onListChanged }: { id: number; see
 
   return (
     <div className="grid h-full grid-rows-[1fr_auto]">
-      <div className="min-h-0 overflow-y-auto px-4 pb-8 pt-4 sm:px-8 sm:pt-6 @container">
+      <div className="min-h-0 overflow-y-auto px-4 pb-8 pt-4 sm:px-8 sm:pt-6 @container" id="detail-scroll">
         <Button variant="ghost" size="sm" className="-ml-2 mb-2 lg:hidden" onClick={() => router.push("/")}><ArrowLeft className="size-4" />Recordings</Button>
         <input
           value={title}
@@ -89,7 +89,7 @@ export function RecordingDetail({ id, seekTo, onListChanged }: { id: number; see
 
         {done && (
           <Tabs value={tab} onValueChange={pick} className="mt-4">
-            <TabsList variant="line" className="-mx-1 w-full flex-wrap justify-start overflow-visible px-1">
+            <TabsList variant="line" className="glass sticky top-0 z-10 -mx-4 w-[calc(100%+2rem)] flex-wrap justify-start overflow-visible px-4 sm:-mx-8 sm:w-[calc(100%+4rem)] sm:px-8">
               <TabsTrigger value="transcript">Transcript</TabsTrigger>
               <TabsTrigger value="summary" className="gap-1.5">Summary{(r.summary_status === "queued" || r.summary_status === "running") && <span className="blink size-1.5 rounded-full bg-signal" />}</TabsTrigger>
               <TabsTrigger value="details">Details</TabsTrigger>
@@ -97,7 +97,7 @@ export function RecordingDetail({ id, seekTo, onListChanged }: { id: number; see
               <TabsTrigger value="notes" className="gap-1.5">Notes{r.notes?.trim() && <span className="size-1.5 rounded-full bg-ink-3" />}</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="transcript" className="mt-4">
+            <TabsContent value="transcript" keepMounted className="mt-4">
               <div className="flex flex-wrap gap-2">
                 {r.speakers.map((s) => <SpeakerPopover key={s.label} r={r} s={s} onChange={() => { mutate(); onListChanged(); }} />)}
                 <span className="hidden self-center text-[12px] text-ink-3 md:inline">Click a speaker name in the transcript to correct it.</span>
@@ -107,15 +107,15 @@ export function RecordingDetail({ id, seekTo, onListChanged }: { id: number; see
               </div>
             </TabsContent>
 
-            <TabsContent value="summary" className="mt-4">
+            <TabsContent value="summary" keepMounted className="mt-4">
               <SummaryTab r={r} onChange={() => mutate()} />
             </TabsContent>
 
-            <TabsContent value="details" className="mt-4">
+            <TabsContent value="details" keepMounted className="mt-4">
               <Details r={r} />
             </TabsContent>
 
-            <TabsContent value="actions" className="mt-4">
+            <TabsContent value="actions" keepMounted className="mt-4">
               <div className="mx-auto grid max-w-[720px] gap-2">
                 <Action icon={<FileText className="size-4" />} title="Export transcript" desc="Plain text with timecodes and speaker names." href={urls.transcript(id)} newTab />
                 {hasAudio && <Action icon={<Download className="size-4" />} title="Download original audio" desc={`The untouched file (${r.original_name}).`} href={urls.original(id)} />}
@@ -128,7 +128,7 @@ export function RecordingDetail({ id, seekTo, onListChanged }: { id: number; see
               </div>
             </TabsContent>
 
-            <TabsContent value="notes" className="mt-4">
+            <TabsContent value="notes" keepMounted className="mt-4">
               <div className="mx-auto max-w-[720px]">
                 <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Add notes about this recording…" className="min-h-[200px] bg-surface text-[15px] leading-relaxed"
                   onBlur={async () => { if (notes !== (r.notes ?? "")) { await api(`/api/recordings/${id}`, { method: "PATCH", json: { notes } }); mutate(); toast("Notes saved"); } }} />

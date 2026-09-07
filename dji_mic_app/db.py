@@ -198,6 +198,12 @@ class Database:
         ).fetchone()
         return dict(r) if r else None
 
+    def next_summary_queued(self) -> dict | None:
+        r = self.connect().execute(
+            "SELECT * FROM recordings WHERE status='done' AND summary_status='queued' ORDER BY id ASC LIMIT 1"
+        ).fetchone()
+        return dict(r) if r else None
+
     def delete_recording(self, rid: int) -> None:
         c = self.connect()
         with c:

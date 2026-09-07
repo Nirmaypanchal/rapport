@@ -259,10 +259,7 @@ class Importer:
     ) -> int | None:
         sha = sha256_file(src)
         if self.db.has_sha(sha):
-            if delete_source and self._inside_volume(src):
-                # Already safely in the library (e.g. a previous run copied it but the delete failed).
-                self._delete_source(src)
-            return None
+            return None  # already in the library; leave the device alone
 
         parsed = parse_name(src.name)
         recorded_at = recorded_at_override or parsed.recorded_at or datetime.fromtimestamp(st.st_mtime)

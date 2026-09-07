@@ -58,7 +58,6 @@
     },
     "shortDescription": "Every voice note and meeting you record. On your Mac.",
     "resources": {
-      "../../sidecar/dist/rapport-core/": "core/",
       "../../../frontend/out/": "ui/"
     }
   }

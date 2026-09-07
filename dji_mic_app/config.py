@@ -25,7 +25,7 @@ DEFAULT_LIBRARY = Path(os.environ.get("DJI_MIC_LIBRARY", Path.home() / "DJI Mic 
 class Settings:
     # Import
     auto_import: bool = True
-    delete_from_device_after_import: bool = True
+    delete_from_device_after_import: bool = False  # copy only; the mic is never cleared unless you opt in
     poll_interval_sec: float = 5.0
     min_file_age_sec: float = 20.0  # skip files still being written by the mic
     extra_volume_names: list[str] = field(default_factory=list)  # manual volume names to treat as mics
@@ -101,6 +101,15 @@ class Library:
         s = Settings()
         self.save_settings(s)
         return s
+
+    def reload_settings(self) -> Settings:
+        """Re-read settings.json (another process may have changed it)."""
+        try:
+            if self.settings_path.exists():
+                self.settings = Settings.from_json(json.loads(self.settings_path.read_text()))
+        except Exception:
+            pass
+        return self.settings
 
     def save_settings(self, settings: Settings | None = None) -> None:
         with self._lock:

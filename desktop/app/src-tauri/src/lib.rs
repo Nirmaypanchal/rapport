@@ -32,7 +32,8 @@ fn locate(app: &AppHandle) -> (PathBuf, PathBuf, PathBuf) {
 }
 
 fn token() -> String {
-    uuid::Uuid::new_v4().simple().to_string()
+    // RAPPORT_TOKEN lets automated tests talk to the sidecar; normally a fresh random token per launch.
+    std::env::var("RAPPORT_TOKEN").ok().filter(|t| !t.is_empty()).unwrap_or_else(|| uuid::Uuid::new_v4().simple().to_string())
 }
 
 fn set_status(win: &WebviewWindow, text: &str) {
@@ -49,7 +50,12 @@ fn start_core(app: AppHandle) {
         return;
     }
     let tok = token();
-    let mut child = match Command::new(&core)
+    // The .app bundle path (exe is Contents/MacOS/rapport); the sidecar uses it to reveal Rapport in Finder.
+    let app_path = std::env::current_exe().ok().and_then(|p| p.ancestors().nth(3).map(|a| a.to_path_buf())).filter(|p| p.extension().map(|e| e == "app").unwrap_or(false));
+    let mut cmd = Command::new(&core);
+    if let Some(ap) = &app_path { cmd.env("RAPPORT_APP_PATH", ap); }
+    cmd.env("RAPPORT_APP_NAME", "Rapport");
+    let mut child = match cmd
         .args(["--port", "0", "--library"])
         .arg(&library)
         .args(["--token", &tok, "--ui"])
