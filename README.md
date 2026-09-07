@@ -95,6 +95,12 @@ and processed here; transcripts from other apps are imported as text (no player,
 Integrations are read-only and sync every 10 minutes when a key is present; nothing is written back.
 Keys live in `settings.json` inside the library folder and never leave the Mac except to call that one service.
 
+## Landing page
+
+`site/index.html` is the Rapport landing page, a single self-contained file. It deploys to
+Vercel as a static site: `vercel.json` points the output at `site/` and `.vercelignore` hides
+the rest of the repository, so Vercel never tries to build the Python app (which only runs on a Mac).
+
 ## Correcting the transcript
 
 Speaker detection is occasionally wrong for a turn. Fix it in place; every correction is

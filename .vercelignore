@@ -1,0 +1,5 @@
+# Vercel hosts only the landing page. The app itself runs on the user's Mac.
+*
+!site
+!site/**
+!vercel.json
