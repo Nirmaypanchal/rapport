@@ -31,7 +31,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       <nav className="hidden flex-col gap-1 border-r border-hairline bg-surface p-3 md:flex md:items-center xl:items-stretch">
         <Link href="/" className="mb-3 flex items-center gap-2 px-2 py-1 font-display text-[15px] font-semibold">
           <span className={cn("size-2 shrink-0 rounded-full", status?.recording ? "bg-signal blink" : vols.length ? "bg-good" : "bg-ink-3")} aria-hidden />
-          <span className="hidden xl:inline">Voice Library</span>
+          <span className="hidden xl:inline">Rapport</span>
         </Link>
         {NAV.map(({ href, label, icon: Icon, key }) => (
           <Link

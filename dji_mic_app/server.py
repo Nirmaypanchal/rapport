@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, UploadFile
@@ -17,7 +18,7 @@ from .speakers import next_color
 from .dji import AUDIO_EXT
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
-NEXT_DIR = Path(__file__).resolve().parent.parent / "frontend" / "out"  # `npm run build` output, preferred when present
+NEXT_DIR = Path(os.environ.get("RAPPORT_UI_DIR") or (Path(__file__).resolve().parent.parent / "frontend" / "out"))  # `npm run build` output; the desktop shell points RAPPORT_UI_DIR at its bundled copy
 
 
 class SettingsPatch(BaseModel):

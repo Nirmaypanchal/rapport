@@ -106,7 +106,20 @@ desktop/sidecar/dist/rapport-core/rapport-core --library ~/Rapport --token SECRE
 
 The sidecar prints `READY <port>` once the API answers, requires the token on every request,
 and carries static ffmpeg/ffprobe in `bin/` so a clean Mac needs no Homebrew. Models still download
-from Hugging Face on first run. Next steps: the Tauri shell, signing and notarization, DMG.
+from Hugging Face on first run.
+
+The shell lives in `desktop/app` (Tauri 2, Rust). It spawns the sidecar with a random token, shows a
+splash until `READY`, then points its window at the sidecar, which also serves the built UI.
+
+```bash
+cd desktop/app && npm install
+export PATH="$HOME/.cargo/bin:$PATH"     # Rust via rustup
+npx tauri dev                            # debug run against desktop/sidecar/dist and frontend/out
+npx tauri build --bundles app,dmg        # Rapport.app with the sidecar and UI inside (unsigned for now)
+```
+
+Existing users keep `~/DJI Mic Library`; new installs use `~/Rapport`. Next: signing and notarization,
+menu bar and dock state, start at login, updater.
 
 ## Landing page
 

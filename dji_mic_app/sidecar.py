@@ -27,8 +27,11 @@ def main() -> None:
     ap.add_argument("--port", type=int, default=0, help="0 = pick a free port")
     ap.add_argument("--library", default=os.environ.get("DJI_MIC_LIBRARY") or str(Path.home() / "DJI Mic Library"))
     ap.add_argument("--token", default=os.environ.get("RAPPORT_TOKEN") or "")
+    ap.add_argument("--ui", default=os.environ.get("RAPPORT_UI_DIR") or "", help="folder with the built web UI (frontend/out)")
     ap.add_argument("--log", default="info")
     args = ap.parse_args()
+    if args.ui:
+        os.environ["RAPPORT_UI_DIR"] = str(Path(args.ui).expanduser())
 
     logging.basicConfig(level=getattr(logging, args.log.upper(), logging.INFO), format="%(asctime)s %(levelname)s %(name)s: %(message)s", stream=sys.stderr)
     for noisy in ("httpx", "urllib3", "pyannote", "lightning", "pytorch_lightning", "torio", "uvicorn.access"):
@@ -78,6 +81,22 @@ def main() -> None:
         print("FAILED", flush=True)
 
     threading.Thread(target=announce, daemon=True).start()
+
+    # If the shell that launched us disappears (quit, crash, kill), exit too: never leave an orphan server behind.
+    parent = os.getppid()
+
+    def watch_parent() -> None:
+        import time
+
+        while True:
+            time.sleep(1.5)
+            if os.getppid() != parent:
+                db.log("Shell exited; sidecar stopping")
+                recorder.stop()
+                os._exit(0)
+
+    if parent > 1:
+        threading.Thread(target=watch_parent, daemon=True).start()
     try:
         uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
     finally:

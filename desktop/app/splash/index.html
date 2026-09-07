@@ -1,0 +1,12 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Rapport</title>
+<style>
+:root{--ground:#F2F2EF;--ink:#16160F;--ink-3:#85857C;--signal:#F2541B}
+@media (prefers-color-scheme:dark){:root{--ground:#121210;--ink:#ECEBE4;--ink-3:#7E7D74;--signal:#FF6B34}}
+html,body{height:100%;margin:0;background:var(--ground);color:var(--ink);font-family:-apple-system,"Schibsted Grotesk","Helvetica Neue",sans-serif;-webkit-user-select:none}
+.c{height:100%;display:grid;place-items:center;text-align:center}
+.mark{width:56px;height:56px;border-radius:14px;background:var(--ink);display:grid;place-items:center;margin:0 auto 18px}
+.mark i{width:22px;height:22px;border-radius:50%;background:var(--signal);animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.35;transform:scale(.85)}}
+h1{font-size:20px;font-weight:600;margin:0 0 6px;letter-spacing:-.01em}p{margin:0;color:var(--ink-3);font-size:13px}
+</style></head><body><div class="c"><div><div class="mark"><i></i></div><h1>Rapport</h1><p id="s">Starting…</p></div></div>
+<script>window.__setStatus=(t)=>{document.getElementById('s').textContent=t}</script></body></html>
