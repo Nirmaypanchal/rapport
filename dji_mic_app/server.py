@@ -61,6 +61,10 @@ class VoiceMemoImport(BaseModel):
     uids: list[str] | None = None
 
 
+class PeopleReset(BaseModel):
+    mode: str = "rematch"
+
+
 class PersonPatch(BaseModel):
     name: str | None = None
     note: str | None = None
@@ -598,6 +602,23 @@ def create_app(library: Library, db: Database, importer: Importer, worker, recor
         r["speakers"] = db.get_speakers(rid)
         r["segments"] = db.get_segments(rid)
         return r
+
+    @app.post("/api/people/reset")
+    def people_reset(body: PeopleReset):
+        """mode=rematch: forget all people, re-match voices from stored fingerprints (seconds).
+        mode=reprocess: also re-run transcription and speaker detection on every recording (slow)."""
+        from .speakers import rematch_all
+
+        if body.mode == "reprocess":
+            db.reset_people()
+            n = db.queue_all_audio()
+            _mini_cache.clear()
+            worker.wake()
+            db.log(f"Speaker reset: all people removed, {n} recordings queued for full re-processing")
+            return {"mode": "reprocess", "queued": n}
+        res = rematch_all(db, library.settings.person_match_threshold)
+        db.log(f"Speaker reset: {res['people_removed']} people removed, voices re-matched into {res['people_now']} people")
+        return {"mode": "rematch", **res}
 
     @app.get("/api/people")
     def people():

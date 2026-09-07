@@ -381,6 +381,27 @@ class Database:
         with c:
             c.execute("DELETE FROM people WHERE id=?", (pid,))
 
+    def reset_people(self) -> int:
+        """Forget every person and every voice match. Speaker labels and transcripts are untouched."""
+        c = self.connect()
+        with c:
+            n = c.execute("SELECT COUNT(*) FROM people").fetchone()[0]
+            c.execute("UPDATE recording_speakers SET person_id=NULL, similarity=NULL")
+            c.execute("DELETE FROM people")
+        return n
+
+    def speakers_with_embeddings(self, rid: int) -> list[dict]:
+        rows = self.connect().execute(
+            "SELECT id, label, speaking_sec, embedding, embedding_model, display_name FROM recording_speakers WHERE recording_id=? ORDER BY speaking_sec DESC", (rid,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def queue_all_audio(self) -> int:
+        c = self.connect()
+        with c:
+            cur = c.execute("UPDATE recordings SET status='queued', stage=NULL, error=NULL WHERE has_audio=1 AND status IN ('done','error')")
+            return cur.rowcount
+
     def person_embeddings(self, model: str) -> list[tuple[int, bytes, float]]:
         """All stored (person_id, embedding, speaking_sec) for the given embedding model."""
         rows = self.connect().execute(

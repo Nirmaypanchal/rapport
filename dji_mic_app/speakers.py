@@ -144,3 +144,30 @@ def assign_people(db: Database, speakers: list[dict], model: str, threshold: flo
         pid = db.create_person(next_auto_name(db), auto=True, color=next_color(db))
         sp["person_id"] = pid
         sp["similarity"] = None
+
+
+def rematch_all(db: Database, threshold: float) -> dict:
+    """Forget all people, then re-run voice matching over every recording in chronological order
+    using the embeddings stored at processing time. Fast: no audio is touched."""
+    removed = db.reset_people()
+    recs = sorted(db.list_recordings(), key=lambda r: (r.get("recorded_at") or "", r["id"]))
+    matched = 0
+    for r in recs:
+        speakers = db.speakers_with_embeddings(r["id"])
+        if not speakers:
+            continue
+        model = next((sp["embedding_model"] for sp in speakers if sp.get("embedding_model")), None)
+        for sp in speakers:
+            sp["embedding_vec"] = from_blob(sp["embedding"]) if sp.get("embedding") else None
+        if model is None:
+            continue
+        assign_people(db, speakers, model, threshold)
+        for sp in speakers:
+            if sp.get("person_id"):
+                db.set_speaker_person(r["id"], sp["label"], sp["person_id"])
+                if sp.get("similarity") is not None:
+                    c = db.connect()
+                    with c:
+                        c.execute("UPDATE recording_speakers SET similarity=? WHERE recording_id=? AND label=?", (sp["similarity"], r["id"], sp["label"]))
+                matched += 1
+    return {"people_removed": removed, "speakers_matched": matched, "people_now": len(db.list_people())}

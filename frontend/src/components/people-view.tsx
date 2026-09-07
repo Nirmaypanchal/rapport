@@ -11,6 +11,7 @@ import { fmtClock, fmtDate, fmtDur } from "@/lib/format";
 import { speakerGlyph } from "@/lib/speakers";
 import { SpeakerAvatar } from "@/components/avatar";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -33,7 +34,10 @@ export function PeopleView() {
         <p className="mt-1 max-w-[62ch] text-[13.5px] text-ink-2">Everyone whose voice has been heard. Auto-named people like “Speaker 3” are matched by voice across recordings; rename them once and the name follows the voice.</p>
 
         {people && people.length > 0 && (
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${people.length} people…`} className="mt-5 h-10 max-w-[420px] bg-surface" />
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${people.length} people…`} className="h-10 max-w-[420px] flex-1 bg-surface" />
+            <ResetSpeakers onDone={() => mutate()} />
+          </div>
         )}
         {!people?.length ? (
           <div className="mt-10 text-center text-[13px] text-ink-3">No one yet. Process a recording first.</div>
@@ -96,5 +100,40 @@ function PersonRow({ p, people, selected, onChange }: { p: Person; people: Perso
         </div>
       </td>
     </tr>
+  );
+}
+
+
+function ResetSpeakers({ onDone }: { onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const run = async (mode: "rematch" | "reprocess") => {
+    setBusy(mode);
+    try {
+      const r = await api<{ mode: string; people_now?: number; queued?: number }>("/api/people/reset", { method: "POST", json: { mode } });
+      toast(mode === "rematch" ? `Voices re-matched into ${r.people_now} people` : `${r.queued} recordings queued for re-processing`);
+      setOpen(false); onDone();
+    } catch (e) { toast(`Reset failed: ${(e as Error).message}`); }
+    setBusy(null);
+  };
+  return (
+    <>
+      <Button variant="outline" onClick={() => setOpen(true)}>Reset speakers…</Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader><DialogTitle>Reset speakers</DialogTitle><DialogDescription>Start over with who's who. Both options remove every person and every name you've given.</DialogDescription></DialogHeader>
+          <div className="grid gap-3 text-[13.5px]">
+            <button type="button" disabled={!!busy} onClick={() => run("rematch")} className="rounded-lg border border-hairline bg-surface p-4 text-left transition-colors hover:border-ink-3 disabled:opacity-50">
+              <div className="font-semibold">Re-match voices <span className="ml-2 rounded-full bg-good-soft px-2 py-px text-[11px] text-good">seconds</span></div>
+              <div className="mt-1 text-ink-2">Forgets all people, then groups the voices again from the fingerprints already stored, oldest recording first. Transcripts and your turn corrections stay as they are.{busy === "rematch" ? " Working…" : ""}</div>
+            </button>
+            <button type="button" disabled={!!busy} onClick={() => { if (confirm("Re-process every recording?\n\nThis re-runs transcription and speaker detection from the audio. Manual turn corrections are replaced. It takes a few minutes per hour of audio.")) run("reprocess"); }} className="rounded-lg border border-hairline bg-surface p-4 text-left transition-colors hover:border-clip disabled:opacity-50">
+              <div className="font-semibold">Re-process everything <span className="ml-2 rounded-full bg-warn-soft px-2 py-px text-[11px] text-warn">slow</span></div>
+              <div className="mt-1 text-ink-2">Forgets all people and re-runs speaker detection on the audio of every recording. Use this if the speaker turns themselves are wrong, not just the names.{busy === "reprocess" ? " Queuing…" : ""}</div>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
