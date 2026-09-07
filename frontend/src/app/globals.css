@@ -1,0 +1,218 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ============================================================
+   CUE SHEET tokens — see the design guide. Components use tokens only.
+   ============================================================ */
+:root {
+  --ground: #f2f2ef;
+  --surface: #ffffff;
+  --surface-2: #e9e9e5;
+  --hairline: #dedED9;
+  --ink: #16160f;
+  --ink-2: #4e4e46;
+  --ink-3: #85857c;
+  --signal: #f2541b;
+  --signal-soft: #fde7dd;
+  --good: #2e9e5b; --good-soft: #dff3e6;
+  --warn: #d9930d; --warn-soft: #fbefd3;
+  --clip: #d9483b; --clip-soft: #fbe1de;
+  --wave: #b9b9b2;
+  --wave-played: #16160f;
+  --shadow-pop: 0 12px 32px rgba(22, 22, 15, 0.16), 0 1px 2px rgba(22, 22, 15, 0.08);
+
+  /* 16 pastel speaker pairs: wash is the identity, ink is the name text. */
+  --spk-sky: #32669A; --spk-sky-wash: #D4EDFF;
+  --spk-blush: #934951; --spk-blush-wash: #FFDEE0;
+  --spk-sage: #427138; --spk-sage-wash: #DAF1D5;
+  --spk-orchid: #804E82; --spk-orchid-wash: #FAE0FA;
+  --spk-butter: #796006; --spk-butter-wash: #F5E9C8;
+  --spk-aqua: #00747A; --spk-aqua-wash: #C8F3F5;
+  --spk-periwinkle: #535D9C; --spk-periwinkle-wash: #E0E8FF;
+  --spk-peach: #924D35; --spk-peach-wash: #FFE0D3;
+  --spk-mint: #1F744F; --spk-mint-wash: #D1F3DF;
+  --spk-rose: #8D4A6B; --spk-rose-wash: #FFDEEE;
+  --spk-lime: #62691B; --spk-lime-wash: #E8EECC;
+  --spk-steel: #006E8E; --spk-steel-wash: #CBF1FF;
+  --spk-lilac: #6C5594; --spk-lilac-wash: #EEE3FF;
+  --spk-apricot: #8A5619; --spk-apricot-wash: #FFE4CB;
+  --spk-seafoam: #007565; --spk-seafoam-wash: #CAF4EB;
+  --spk-dusk: #864C7A; --spk-dusk-wash: #FEDFF6;
+  --spk-none: var(--ink-3); --spk-none-wash: var(--surface-2);
+
+  /* shadcn variables, fed from the tokens so its components sit on the same system */
+  --background: var(--ground);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface);
+  --popover-foreground: var(--ink);
+  --primary: var(--ink);
+  --primary-foreground: var(--ground);
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--ink);
+  --muted: var(--surface-2);
+  --muted-foreground: var(--ink-3);
+  --accent: var(--surface-2);
+  --accent-foreground: var(--ink);
+  --destructive: var(--clip);
+  --border: var(--hairline);
+  --input: var(--hairline);
+  --ring: var(--signal);
+  --radius: 0.625rem;
+  --chart-1: var(--spk-sky); --chart-2: var(--spk-blush); --chart-3: var(--spk-sage); --chart-4: var(--spk-orchid); --chart-5: var(--spk-butter);
+  --sidebar: var(--surface); --sidebar-foreground: var(--ink); --sidebar-primary: var(--ink); --sidebar-primary-foreground: var(--ground);
+  --sidebar-accent: var(--surface-2); --sidebar-accent-foreground: var(--ink); --sidebar-border: var(--hairline); --sidebar-ring: var(--signal);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --ground: #121210; --surface: #1b1b18; --surface-2: #26261f; --hairline: #2e2e28;
+    --ink: #ecebe4; --ink-2: #b4b3aa; --ink-3: #7e7d74;
+    --signal: #ff6b34; --signal-soft: #3a2117;
+    --good: #4fc17b; --good-soft: #163a24; --warn: #f0b03a; --warn-soft: #3d2e0e; --clip: #f06a5d; --clip-soft: #43201c;
+    --wave: #4a4a43; --wave-played: #ecebe4;
+    --shadow-pop: 0 16px 40px rgba(0, 0, 0, 0.55), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+    --spk-sky: #91C3F6; --spk-sky-wash: #1E354B;
+    --spk-blush: #F2A6AB; --spk-blush-wash: #49282B;
+    --spk-sage: #9FCC95; --spk-sage-wash: #253920;
+    --spk-orchid: #DCAADE; --spk-orchid-wash: #402A41;
+    --spk-butter: #D4BC79; --spk-butter-wash: #3D3212;
+    --spk-aqua: #71D0D5; --spk-aqua-wash: #083A3D;
+    --spk-periwinkle: #ACBAF8; --spk-periwinkle-wash: #2B314C;
+    --spk-peach: #F1AA92; --spk-peach-wash: #492A1F;
+    --spk-mint: #89D0AA; --spk-mint-wash: #193B2A;
+    --spk-rose: #EBA6C6; --spk-rose-wash: #462836;
+    --spk-lime: #BBC581; --spk-lime-wash: #323616;
+    --spk-steel: #7ACAE9; --spk-steel-wash: #103846;
+    --spk-lilac: #C6B1F0; --spk-lilac-wash: #372D49;
+    --spk-apricot: #E6B27F; --spk-apricot-wash: #442D15;
+    --spk-seafoam: #78D1C0; --spk-seafoam-wash: #0E3B34;
+    --spk-dusk: #E3A8D5; --spk-dusk-wash: #43293D;
+  }
+}
+.dark {
+  --ground: #121210; --surface: #1b1b18; --surface-2: #26261f; --hairline: #2e2e28;
+  --ink: #ecebe4; --ink-2: #b4b3aa; --ink-3: #7e7d74;
+  --signal: #ff6b34; --signal-soft: #3a2117;
+  --good: #4fc17b; --good-soft: #163a24; --warn: #f0b03a; --warn-soft: #3d2e0e; --clip: #f06a5d; --clip-soft: #43201c;
+  --wave: #4a4a43; --wave-played: #ecebe4;
+  --shadow-pop: 0 16px 40px rgba(0, 0, 0, 0.55), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  --spk-sky: #91C3F6; --spk-sky-wash: #1E354B;
+  --spk-blush: #F2A6AB; --spk-blush-wash: #49282B;
+  --spk-sage: #9FCC95; --spk-sage-wash: #253920;
+  --spk-orchid: #DCAADE; --spk-orchid-wash: #402A41;
+  --spk-butter: #D4BC79; --spk-butter-wash: #3D3212;
+  --spk-aqua: #71D0D5; --spk-aqua-wash: #083A3D;
+  --spk-periwinkle: #ACBAF8; --spk-periwinkle-wash: #2B314C;
+  --spk-peach: #F1AA92; --spk-peach-wash: #492A1F;
+  --spk-mint: #89D0AA; --spk-mint-wash: #193B2A;
+  --spk-rose: #EBA6C6; --spk-rose-wash: #462836;
+  --spk-lime: #BBC581; --spk-lime-wash: #323616;
+  --spk-steel: #7ACAE9; --spk-steel-wash: #103846;
+  --spk-lilac: #C6B1F0; --spk-lilac-wash: #372D49;
+  --spk-apricot: #E6B27F; --spk-apricot-wash: #442D15;
+  --spk-seafoam: #78D1C0; --spk-seafoam-wash: #0E3B34;
+  --spk-dusk: #E3A8D5; --spk-dusk-wash: #43293D;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-ground: var(--ground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-hairline: var(--hairline);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-signal: var(--signal);
+  --color-signal-soft: var(--signal-soft);
+  --color-good: var(--good);
+  --color-good-soft: var(--good-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-clip: var(--clip);
+  --color-clip-soft: var(--clip-soft);
+  --color-wave: var(--wave);
+  --color-wave-played: var(--wave-played);
+  --font-sans: var(--font-ui), "Helvetica Neue", Arial, sans-serif;
+  --font-display: var(--font-display), var(--font-ui), sans-serif;
+  --font-mono: var(--font-mono), ui-monospace, "SF Mono", Menlo, monospace;
+  --font-heading: var(--font-display);
+  --shadow-pop: var(--shadow-pop);
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-spring: cubic-bezier(0.3, 1.3, 0.4, 1);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+@layer base {
+  * { @apply border-border outline-ring/50; }
+  html { height: 100%; }
+  body { @apply bg-ground text-ink font-sans antialiased; font-size: 14px; line-height: 1.45; height: 100%; overscroll-behavior: none; }
+  :focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+  ::selection { background: var(--signal-soft); }
+}
+
+/* ---- Cue Sheet primitives that are cheaper as CSS than as components ---- */
+.eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+.tc { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.speaker { --c: var(--spk-none); --wash: var(--spk-none-wash); }
+
+/* word-level highlight, driven imperatively from the player so the transcript never re-renders per frame */
+.w { border-radius: 3px; padding: 0 1px; transition: background 120ms var(--ease-out), color 120ms var(--ease-out); }
+.w.on { background: var(--signal-soft); box-shadow: inset 0 -2px 0 var(--signal); }
+.w.past { color: var(--ink-2); }
+.turn.active { background: var(--surface); box-shadow: inset 2px 0 0 var(--c); }
+.turn.splitting { outline: 2px dashed var(--signal); outline-offset: -2px; background: var(--signal-soft); }
+.turn.splitting .w { cursor: col-resize; }
+.turn.splitting .w:hover { background: var(--signal); color: var(--ground); }
+
+/* translucent dock (the one glass surface) */
+.glass { background: color-mix(in oklab, var(--surface) 82%, transparent); backdrop-filter: blur(14px) saturate(160%); -webkit-backdrop-filter: blur(14px) saturate(160%); }
+@media (prefers-reduced-transparency: reduce) { .glass { background: var(--surface); backdrop-filter: none; } }
+
+.blink { animation: blink 1.4s infinite; }
+@keyframes blink { 50% { opacity: 0.25; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
+
+/* pastel mini scrollbars */
+* { scrollbar-width: thin; scrollbar-color: var(--hairline) transparent; }
