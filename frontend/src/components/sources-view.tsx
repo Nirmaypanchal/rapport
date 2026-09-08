@@ -251,14 +251,53 @@ function VoiceMemosPanel({ vm, auto, onAuto, onChange, onRecheck }: { vm: Omit<V
     );
   }
   const fresh = live?.memos.filter((m) => !m.imported) ?? [];
+  return <MemoPicker memos={fresh} imported={(live?.memos.length ?? 0) - fresh.length} auto={auto} onAuto={onAuto} busy={busy} setBusy={setBusy} onImported={() => { mutate(); onChange(); }} />;
+}
+
+function MemoPicker({ memos, imported, auto, onAuto, busy, setBusy, onImported }: { memos: VoiceMemosStatus["memos"]; imported: number; auto: boolean; onAuto: (v: boolean) => void; busy: boolean; setBusy: (b: boolean) => void; onImported: () => void }) {
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [q, setQ] = useState("");
+  const shown = memos.filter((m) => !q.trim() || m.title.toLowerCase().includes(q.trim().toLowerCase()));
+  const allShown = shown.length > 0 && shown.every((m) => sel.has(m.uid));
+  const toggle = (uid: string) => setSel((cur) => { const n = new Set(cur); if (n.has(uid)) n.delete(uid); else n.add(uid); return n; });
+  const run = async (uids: string[] | null) => {
+    setBusy(true);
+    try {
+      const r = await api<{ imported: number[] }>("/api/voicememos/import", { method: "POST", json: { uids } });
+      toast(r.imported.length ? `Imported ${r.imported.length} memo${r.imported.length === 1 ? "" : "s"}, queued for processing` : "Nothing new to import");
+      setSel(new Set()); onImported();
+    } catch (e) { toast(`Import failed: ${(e as Error).message}`); }
+    setBusy(false);
+  };
   return (
     <div>
       <div className="flex flex-wrap items-center gap-2">
         <Pill tone="good">connected</Pill>
-        <span>{fresh.length ? <><b>{fresh.length}</b> new memo{fresh.length === 1 ? "" : "s"}</> : "Everything is in the library."}</span>
-        {fresh.length > 0 && <Button size="sm" className="ml-auto" disabled={busy} onClick={async () => { setBusy(true); const r = await api<{ imported: number[] }>("/api/sources/voicememos/sync", { method: "POST" }); toast(`Imported ${r.imported.length}`); mutate(); onChange(); setBusy(false); }}>Import all new</Button>}
+        <span>{memos.length ? <><b>{memos.length}</b> memo{memos.length === 1 ? "" : "s"} not yet imported</> : "Everything is in the library."}{imported ? <span className="text-ink-3"> · {imported} imported</span> : null}</span>
       </div>
-      {fresh.length > 0 && <div className="mt-2 max-h-[220px] divide-y divide-hairline overflow-y-auto rounded-md border border-hairline">{fresh.slice(0, 60).map((m) => <div key={m.uid} className="flex items-center gap-3 px-3 py-1.5"><div className="min-w-0 flex-1 truncate">{m.title}</div><span className="text-[12px] text-ink-3">{m.recorded_at ? `${fmtDate(m.recorded_at)}, ${fmtClock(m.recorded_at)}` : ""}</span><span className="tc text-[12px] text-ink-3">{fmtDur(m.duration_sec)}</span></div>)}</div>}
+      {memos.length > 0 && (
+        <>
+          <div className="mt-3 flex items-center gap-2">
+            {memos.length > 6 && <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter by title…" className="h-8 flex-1 bg-surface text-[13px]" />}
+            <button type="button" className="text-[12.5px] text-ink-2 underline-offset-2 hover:underline" onClick={() => setSel(allShown ? new Set() : new Set(shown.map((m) => m.uid)))}>{allShown ? "Select none" : `Select all${q ? " shown" : ""}`}</button>
+          </div>
+          <div className="mt-2 max-h-[300px] divide-y divide-hairline overflow-y-auto rounded-md border border-hairline">
+            {shown.map((m) => (
+              <label key={m.uid} className={cn("flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-surface-2", sel.has(m.uid) && "bg-surface-2")}>
+                <input type="checkbox" checked={sel.has(m.uid)} onChange={() => toggle(m.uid)} className="size-4 accent-[var(--ink)]" />
+                <div className="min-w-0 flex-1"><div className="truncate text-[13.5px] font-medium">{m.title}</div><div className="text-[12px] text-ink-3">{m.recorded_at ? `${fmtDate(m.recorded_at)}, ${fmtClock(m.recorded_at)}` : "Unknown date"}</div></div>
+                <span className="tc text-[12px] text-ink-3">{fmtDur(m.duration_sec)}</span>
+                <Button size="sm" variant="ghost" disabled={busy} onClick={(e) => { e.preventDefault(); run([m.uid]); }}>Import</Button>
+              </label>
+            ))}
+            {!shown.length && <div className="px-3 py-3 text-[12.5px] text-ink-3">No memo matches “{q}”.</div>}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Button size="sm" disabled={busy || sel.size === 0} onClick={() => run([...sel])}>{busy ? "Importing…" : `Import selected${sel.size ? ` (${sel.size})` : ""}`}</Button>
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => { if (confirm(`Import all ${memos.length} memos?`)) run(null); }}>Import all new</Button>
+          </div>
+        </>
+      )}
       <label className="mt-4 flex items-center gap-2 text-[13px]"><Switch checked={auto} onCheckedChange={onAuto} />Import new memos automatically</label>
       <div className="mt-3 flex items-center gap-2 text-[12px] text-ink-3"><Watch className="size-3.5" />Apple Watch and iPhone memos arrive as soon as iCloud syncs them into Voice Memos on this Mac.</div>
     </div>
