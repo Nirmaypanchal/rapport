@@ -7,6 +7,7 @@ import { fmtClock, fmtDay, fmtTime, dayKey, recordingTitle } from "@/lib/format"
 import { speakerGlyph, speakerName } from "@/lib/speakers";
 import { SpeakerAvatar } from "@/components/avatar";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/progress";
 
 /** Up to three overlapping pastel discs: the people in the recording, at a glance. */
 function AvatarStack({ speakers }: { speakers: Speaker[] }) {
@@ -52,7 +53,8 @@ export function RecordingList({ recordings, activeId }: { recordings: Recording[
           lastDay = d;
           const active = r.id === activeId;
           const who = speakerLine(r);
-          const status = r.status !== "done" ? (r.status === "processing" ? r.stage || "processing" : r.status) : null;
+          const pct = r.status === "processing" && typeof r.progress === "number" ? Math.round(r.progress * 100) : null;
+          const status = r.status !== "done" ? (r.status === "processing" ? `${r.stage || "processing"}${pct != null ? ` · ${pct}%` : ""}` : r.status) : null;
           return (
             <div key={r.id}>
               {header}
@@ -75,6 +77,7 @@ export function RecordingList({ recordings, activeId }: { recordings: Recording[
                 </div>
                 <AvatarStack speakers={r.speakers} />
                 <div className="tc w-9 text-right text-[12px] text-ink-3">{fmtTime(r.duration_sec)}</div>
+                {r.status === "processing" && <Progress value={r.progress} className="col-span-3 mt-1" />}
               </Link>
             </div>
           );

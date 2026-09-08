@@ -115,7 +115,7 @@ class Database:
                 c.execute("ALTER TABLE recordings ADD COLUMN source TEXT DEFAULT 'dji'")
             if "source_id" not in cols:
                 c.execute("ALTER TABLE recordings ADD COLUMN source_id TEXT")
-            for col, typ in (("summary", "TEXT"), ("summary_model", "TEXT"), ("summary_at", "TEXT"), ("summary_status", "TEXT"), ("summary_error", "TEXT"), ("has_audio", "INTEGER DEFAULT 1")):
+            for col, typ in (("summary", "TEXT"), ("summary_model", "TEXT"), ("summary_at", "TEXT"), ("summary_status", "TEXT"), ("summary_error", "TEXT"), ("has_audio", "INTEGER DEFAULT 1"), ("progress", "REAL")):
                 if col not in cols:
                     c.execute(f"ALTER TABLE recordings ADD COLUMN {col} {typ}")
             scols = {r[1] for r in c.execute("PRAGMA table_info(recording_speakers)")}

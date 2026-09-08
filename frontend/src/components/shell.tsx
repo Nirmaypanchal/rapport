@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { Disc3, Plug, Search, Settings2, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStatus } from "@/lib/use-status";
+import { Progress } from "@/components/progress";
 
 const NAV = [
   { href: "/", label: "Recordings", icon: Disc3, key: "1" },
@@ -23,7 +24,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const { data: status } = useStatus();
   const vols = status?.importer.volumes ?? [];
   const files = vols.reduce((a, v) => a + v.files, 0);
-  const busy = status?.recording ? { title: "Recording", detail: status.recording.device } : status?.importer.importing ? { title: "Importing", detail: status.importer.importing } : status?.worker.current ? { title: `Processing · ${status.stats.queued} queued`, detail: `${status.worker.current.name}\n${status.worker.current.stage || "starting"}` } : null;
+  const busy = status?.recording ? { title: "Recording", detail: status.recording.device } : status?.importer.importing ? { title: "Importing", detail: status.importer.importing } : status?.worker.current ? { title: `Processing${typeof status.worker.current.progress === "number" ? ` · ${Math.round(status.worker.current.progress * 100)}%` : ""}${status.stats.queued > 1 ? ` · ${status.stats.queued - 1} more queued` : ""}`, detail: `${status.worker.current.name}\n${status.worker.current.stage || "starting"}` } : null;
 
   return (
     <div className="grid h-full grid-rows-[1fr_auto] md:grid-cols-[64px_1fr] md:grid-rows-1 xl:grid-cols-[220px_1fr]">
@@ -53,6 +54,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <Link href={status?.recording ? "/sources/" : "/"} className="rounded-md bg-signal-soft px-2.5 py-2 text-[12px] text-ink">
               <div className="flex items-center gap-1.5 font-medium"><span className="blink size-1.5 rounded-full bg-signal" />{busy.title}</div>
               <div className="mt-0.5 whitespace-pre-line text-ink-2">{busy.detail}</div>
+              {status?.worker.current && <Progress value={status.worker.current.progress} className="mt-2" />}
             </Link>
           )}
           <div className={cn("flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-medium", vols.length ? "bg-good-soft text-good" : "bg-surface-2 text-ink-3")}>

@@ -49,6 +49,7 @@ export type Recording = {
   transmitter: string | null;
   status: "queued" | "processing" | "done" | "error";
   stage: string | null;
+  progress?: number | null;
   error: string | null;
   language: string | null;
   diarizer: string | null;
@@ -146,7 +147,7 @@ export async function uploadFiles(files: File[]): Promise<{ imported: number[]; 
 export type Status = {
   library: string;
   importer: { volumes: { mount: string; name: string; media: string; files: number }[]; importing: string | null; last_scan: string | null; last_error: string | null };
-  worker: { current: { id: number; name: string; stage: string } | null; models: { embedder_loaded: boolean; pyannote_loaded: boolean; pyannote_error: string | null; builtin_loaded: boolean } };
+  worker: { current: { id: number; name: string; stage: string; progress?: number } | null; models: { embedder_loaded: boolean; pyannote_loaded: boolean; pyannote_error: string | null; builtin_loaded: boolean } };
   stats: { recordings: number; queued: number; people: number; hours: number };
   settings: Settings;
   hf_token_present: boolean;

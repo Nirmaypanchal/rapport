@@ -28,13 +28,15 @@ class Embedder:
         self.device = torch.device("cpu")
         self.model.to(self.device)
 
-    def embed_batch(self, clips: list[np.ndarray], batch_size: int = 32) -> np.ndarray:
+    def embed_batch(self, clips: list[np.ndarray], batch_size: int = 32, on_progress=None) -> np.ndarray:
         """Equal-length clips -> (n, d) L2-normalised embeddings."""
         import torch
 
         out = []
         with torch.inference_mode():
             for i in range(0, len(clips), batch_size):
+                if on_progress:
+                    on_progress(i / max(1, len(clips)))
                 batch = np.stack(clips[i:i + batch_size]).astype(np.float32)
                 x = torch.from_numpy(batch).unsqueeze(1).to(self.device)  # (b, 1, samples)
                 e = self.model(x)

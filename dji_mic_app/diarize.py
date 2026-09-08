@@ -126,6 +126,8 @@ class BuiltinDiarizer:
     def speech_regions(self, audio: np.ndarray) -> list[tuple[float, float]]:
         return speech_regions(audio, self.vad)
 
+    on_progress = None  # set by the pipeline per job
+
     def __call__(self, audio: np.ndarray) -> list[Turn]:
         regions = self.speech_regions(audio)
         if not regions:
@@ -155,7 +157,7 @@ class BuiltinDiarizer:
         if not clips:
             return _relabel_by_duration([Turn(s, e, "A") for s, e in regions])
 
-        emb = self.embedder.embed_batch(clips)  # (n, d) L2-normalised
+        emb = self.embedder.embed_batch(clips, on_progress=self.on_progress)  # (n, d) L2-normalised
         labels = self._cluster(emb)
 
         # Drop tiny clusters into their nearest neighbour.

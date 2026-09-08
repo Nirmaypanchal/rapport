@@ -176,9 +176,24 @@ class Worker:
                 continue
             self.process(rec)
 
-    def _stage(self, rid: int, stage: str) -> None:
+    def _stage(self, rid: int, stage: str, frac: float | None = None) -> None:
         self.progress = stage
-        self.db.update_recording(rid, stage=stage)
+        cols = {"stage": stage}
+        if frac is not None:
+            self.progress_frac = frac
+            cols["progress"] = round(frac, 3)
+        self.db.update_recording(rid, **cols)
+
+    progress_frac: float = 0.0
+    _last_progress_write: float = 0.0
+
+    def _progress(self, rid: int, frac: float) -> None:
+        """Throttled progress write (0-1) for the UI."""
+        self.progress_frac = frac
+        now = time.time()
+        if now - self._last_progress_write >= 0.7 or frac >= 1.0:
+            self._last_progress_write = now
+            self.db.update_recording(rid, progress=round(frac, 3))
 
     def process(self, rec: dict) -> None:
         rid = rec["id"]
@@ -190,7 +205,8 @@ class Worker:
             cache = self.library.recording_cache(rid)
             s = self.library.settings
 
-            self._stage(rid, "converting audio")
+            self.progress_frac = 0.0
+            self._stage(rid, "converting audio", 0.0)
             wav = audio_utils.to_wav16k(src, cache / "audio16k.wav")
             audio_utils.to_playback(src, cache / "playback.m4a")
             samples = audio_utils.load_wav16k(wav)
@@ -199,22 +215,24 @@ class Worker:
             (cache / "speech.json").unlink(missing_ok=True)
             self.models.speech_map(cache, samples)
 
-            self._stage(rid, f"transcribing ({s.whisper_model.split('/')[-1]})")
-            tr = transcribe(samples, s.whisper_model, s.language)
+            self._stage(rid, f"transcribing ({s.whisper_model.split('/')[-1]})", 0.05)
+            tr = transcribe(samples, s.whisper_model, s.language, on_progress=lambda f: self._progress(rid, 0.05 + 0.67 * f))
 
-            self._stage(rid, "finding speakers")
+            self._stage(rid, "finding speakers", 0.72)
             diarizer_name = "none"
             turns: list[Turn] = []
             try:
                 diarizer = self.models.diarizer()
                 diarizer_name = diarizer.name
+                if hasattr(diarizer, "on_progress"):
+                    diarizer.on_progress = lambda f: self._progress(rid, 0.72 + 0.20 * f)
                 turns = diarizer(samples)
             except Exception as e:
                 self.db.log(f"Diarization failed for {rec['original_name']}: {e}", "warn")
             if not turns:
                 turns = [Turn(0.0, duration, "SPEAKER_00")]
 
-            self._stage(rid, "matching voices to people")
+            self._stage(rid, "matching voices to people", 0.94)
             embedder = self.models.embedder()
             by_label: dict[str, list[tuple[float, float]]] = {}
             for t in turns:
@@ -231,13 +249,13 @@ class Worker:
                 })
             assign_people(self.db, speakers, embedder.model_name, s.person_match_threshold)
 
-            self._stage(rid, "saving")
+            self._stage(rid, "saving", 0.98)
             segments = words_to_segments(tr["words"], turns)
             self.db.replace_segments(rid, segments)
             self.db.replace_speakers(rid, speakers)
             self.db.update_recording(
                 rid, status="done", stage=None, language=tr.get("language"), whisper_model=s.whisper_model,
-                diarizer=diarizer_name, processed_at=now_iso(), duration_sec=duration,
+                diarizer=diarizer_name, processed_at=now_iso(), duration_sec=duration, progress=1.0,
             )
             names = []
             for sp in speakers:
@@ -302,6 +320,6 @@ class Worker:
 
     def status(self) -> dict:
         return {
-            "current": {"id": self.current["id"], "name": self.current["original_name"], "stage": self.progress} if self.current else None,
+            "current": {"id": self.current["id"], "name": self.current["original_name"], "stage": self.progress, "progress": round(self.progress_frac, 3)} if self.current else None,
             "models": self.models.status(),
         }

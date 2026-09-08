@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { Progress } from "@/components/progress";
 
 const TABS = ["transcript", "summary", "details", "actions", "notes"] as const;
 type Tab = (typeof TABS)[number];
@@ -80,10 +81,14 @@ export function RecordingDetail({ id, seekTo, onListChanged }: { id: number; see
         <div className="mt-1 text-[12.5px] text-ink-3">{fmtDate(r.recorded_at)} · {fmtClock(r.recorded_at)} · <span className="tc">{fmtDur(r.duration_sec)}</span>{!hasAudio && <> · text only, from {sourceLabel(r.source)}</>}</div>
 
         {r.status !== "done" && (
-          <div className={cn("mt-5 flex items-center gap-3 rounded-lg border border-hairline bg-surface px-4 py-4 text-[13.5px]", r.status === "error" ? "text-clip" : "text-ink-2")}>
-            {r.status === "error" ? <span>⚠︎</span> : <span className="blink size-2 rounded-full bg-signal" />}
-            <span className="flex-1">{r.status === "error" ? `Processing failed: ${r.error}` : r.status === "processing" ? `Processing · ${r.stage || "starting"}` : "Waiting in queue…"}</span>
-            {r.status === "error" && <Button size="sm" variant="outline" onClick={() => reprocess(r, mutate, onListChanged, true)}>Retry</Button>}
+          <div className={cn("mt-5 rounded-lg border border-hairline bg-surface px-4 py-4 text-[13.5px]", r.status === "error" ? "text-clip" : "text-ink-2")}>
+            <div className="flex items-center gap-3">
+              {r.status === "error" ? <span>⚠︎</span> : <span className="blink size-2 rounded-full bg-signal" />}
+              <span className="flex-1">{r.status === "error" ? `Processing failed: ${r.error}` : r.status === "processing" ? `${r.stage || "Starting"}` : "Waiting in queue…"}</span>
+              {r.status === "processing" && typeof r.progress === "number" && <span className="tc text-[12.5px] text-ink-3">{Math.round(r.progress * 100)}%</span>}
+              {r.status === "error" && <Button size="sm" variant="outline" onClick={() => reprocess(r, mutate, onListChanged, true)}>Retry</Button>}
+            </div>
+            {r.status === "processing" && <Progress value={r.progress} className="mt-3" />}
           </div>
         )}
 
