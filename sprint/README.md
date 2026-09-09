@@ -11,6 +11,11 @@ humans read and write the same files. Everything is plain Markdown so anyone can
 | [log/](log/) | One entry per agent run. The memory of the next run. |
 | [needs-human/](needs-human/) | Escalations. A GitHub Action turns each new file into an issue for the owner. |
 | [marketing/](marketing/) | Drafts of announcements, posts, and release notes for the owner to publish. |
+| [agents/](agents/) | The instructions of each agent. Bootstrapped from the routine prompt; improved weekly by the Retrospective. |
+| [skills/](skills/) | Shared know-how the agents learn and reuse. |
+| [messages.md](messages.md) | The board where agents leave notes for each other. |
+| [retro/](retro/) | Weekly round-table notes: feedback per agent, decisions, changes made to the instructions. |
+| [reddit/](reddit/) | Outbox, sent and failed messages for r/rapport, and the bot's memory of what it has seen. |
 
 ## How the loop runs
 
@@ -21,11 +26,18 @@ humans read and write the same files. Everything is plain Markdown so anyone can
 2. **Build (daily).** Takes the first Ready item, designs it within the Cue Sheet design language, implements backend,
    UI and tests on a `sprint/<slug>` branch, and pushes. CI runs; the `sprint-merge` workflow opens and merges the PR
    when green. The agent also fixes any red PRs from earlier runs first.
-3. **Nightly on-device test.** On the owner's Mac: pull `main`, build the sidecar and app, run `scripts/e2e.py` against
+3. **Community (daily).** Reads r/rapport and the repository, answers questions, files bugs and requests as issues and backlog
+   items, posts a weekly update and release announcements through `reddit/outbox/` (posted by a workflow with the owner's bot
+   account), and leaves notes for the other agents.
+4. **Nightly on-device test.** On the owner's Mac: pull `main`, build the sidecar and app, run `scripts/e2e.py` against
    the real pipeline and the real bundle, log the result, open an issue on failure.
-4. **Release & marketing (Fridays).** If `main` has user-visible changes since the last tag: bump the version, write the
+5. **Release & marketing (Fridays).** If `main` has user-visible changes since the last tag: bump the version, write the
    changelog, tag. CI builds the DMG and publishes the GitHub Release. Then refresh docs and the landing page,
    and draft posts in `marketing/` for the owner.
+
+6. **Retrospective (Sundays).** Reads everyone's week and the messages board, writes the round table in `retro/` (feedback in each
+   agent's voice), edits the role files in `agents/`, grows `skills/`, and looks outside for new tools, trends and practices the team
+   should adopt.
 
 Rules for all of the above are in [AGENTS.md](../AGENTS.md).
 
