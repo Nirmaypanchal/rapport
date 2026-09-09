@@ -299,7 +299,7 @@ class Worker:
         self._summarize(rid, target)
 
     def _summarize(self, rid: int, target: tuple[str, str]) -> None:
-        from .summarize import summarize
+        from .summarize import get_template, summarize
 
         provider, model = target
         with self._summary_lock:
@@ -308,12 +308,16 @@ class Worker:
                 return
             self.db.update_recording(rid, summary_status="running")
             try:
+                s = self.library.settings
+                # The recording's own choice wins; otherwise the default from Settings, resolved now and recorded
+                # with the summary so the UI can show which shape produced this text.
+                template = get_template(rec.get("summary_template") or s.summary_template, s.summary_custom_prompt)
                 names = {sp["label"]: (sp["person_name"] or sp.get("display_name") or sp["label"]) for sp in self.db.get_speakers(rid)}
-                text = summarize(self.db.get_segments(rid), names, provider, model, rec.get("title") or rec["original_name"])
+                text = summarize(self.db.get_segments(rid), names, provider, model, rec.get("title") or rec["original_name"], template)
                 if not text:
                     raise RuntimeError("the model returned nothing")
-                self.db.update_recording(rid, summary=text, summary_model=f"{provider}:{model}", summary_at=now_iso(), summary_status="done", summary_error=None)
-                self.db.log(f"Summarized {rec['original_name']} with {model}")
+                self.db.update_recording(rid, summary=text, summary_model=f"{provider}:{model}", summary_at=now_iso(), summary_status="done", summary_error=None, summary_template=template.id)
+                self.db.log(f"Summarized {rec['original_name']} with {model} ({template.name})")
             except Exception as e:
                 self.db.update_recording(rid, summary_status="error", summary_error=f"{type(e).__name__}: {e}"[:400])
                 self.db.log(f"Summary failed for {rec['original_name']}: {e}", "warn")

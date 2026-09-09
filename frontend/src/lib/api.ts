@@ -65,6 +65,7 @@ export type Recording = {
   summary_at?: string | null;
   summary_status?: "queued" | "running" | "done" | "error" | null;
   summary_error?: string | null;
+  summary_template?: string | null;
   speakers: Speaker[];
   peaks_mini?: number[];
   segments?: Segment[];
@@ -113,6 +114,8 @@ export type Settings = {
   summary_provider: "auto" | "ollama" | "mlx" | "off";
   summary_model: string;
   auto_summarize: boolean;
+  summary_template: string;
+  summary_custom_prompt: string;
   usb_volumes: string[];
   watched_folders: string[];
   granola_api_key: string; granola_auto: boolean;
@@ -169,6 +172,10 @@ export type SearchHit = {
 };
 
 export type LogLine = { id: number; ts: string; level: "info" | "warn" | "error"; message: string };
+
+/** A shape a summary can take. `builtin` ones ship with the app; the other is the user's own prompt. */
+export type SummaryTemplate = { id: string; name: string; description: string; builtin: boolean };
+export type SummaryTemplates = { templates: SummaryTemplate[]; default: string };
 
 export class ApiError extends Error {
   status: number;

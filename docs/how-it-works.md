@@ -48,8 +48,22 @@ so they're instant and reversible. **Reset speakers** on the People page re-runs
 ### 5. Summaries
 
 Written by a model on your Mac: Ollama if it's running (any model you've pulled), otherwise Qwen2.5-3B on MLX, downloaded once.
-The prompt asks for a summary, key points, action items and notable quotes, in the language of the transcript, using the
-speaker names you've set. Notes that arrive from Granola or Omi keep the summary those apps wrote.
+Every prompt starts from the same rules — write in the language of the transcript, use the speaker names you've set, never
+invent a fact, a name or a number — and a **template** decides the sections:
+
+| Template | What you get |
+|---|---|
+| Meeting notes | Summary, key points, action items, notable quotes |
+| Interview | Summary, questions and answers, stories, quotes, follow-ups |
+| Lecture or talk | Summary, outline, key terms, examples, questions raised |
+| Sales call | Summary, what they need, objections, budget and timing, next steps |
+| Journal or voice note | Summary, what was said, to-dos, open questions |
+| Custom prompt | Whatever you ask for, in Settings |
+
+Settings → Summary template sets the default for new recordings. Any recording can use a different one: pick it in the
+Summary tab and press Regenerate. Existing summaries are left alone until you do — nothing is rewritten behind your back.
+The templates are plain Markdown files in `rapport/templates/`, so you can edit them or add your own. Notes that arrive
+from Granola or Omi keep the summary those apps wrote.
 
 ### 6. Playback and search
 

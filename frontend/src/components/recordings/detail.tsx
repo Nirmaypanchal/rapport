@@ -170,6 +170,7 @@ function Details({ r }: { r: Recording }) {
     ["Transcription", r.whisper_model ? <span key="w" className="tc">{r.whisper_model.split("/").pop()}</span> : "—"],
     ["Speaker detection", r.diarizer === "pyannote" ? "pyannote diarization pipeline" : r.diarizer === "builtin" ? "Built-in (Silero VAD + WeSpeaker embeddings)" : r.diarizer ?? "—"],
     ["Summary model", r.summary_model ? <span key="s" className="tc">{r.summary_model}</span> : "—"],
+    ["Summary template", r.summary_template ? <span key="st" className="tc">{r.summary_template}</span> : "—"],
     ["Processed", r.processed_at ? `${fmtDate(r.processed_at)}, ${fmtClock(r.processed_at)}` : "—"],
     ["Imported", r.imported_at ? `${fmtDate(r.imported_at)}, ${fmtClock(r.imported_at)}${r.deleted_from_device ? " · removed from the mic after verification" : ""}` : "—"],
     ["Speakers", `${r.speakers.length}`],

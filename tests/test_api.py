@@ -5,8 +5,15 @@ from rapport.server import create_app
 
 
 class _Worker:
+    def __init__(self):
+        self.queued = []
+
     def status(self):
         return {"state": "idle"}
+
+    def summarize_later(self, rid):
+        self.queued.append(rid)
+        return True
 
 
 class _Recorder:
@@ -14,8 +21,8 @@ class _Recorder:
         return {"active": False}
 
 
-def _client(library, db, token=None):
-    app = create_app(library, db, Importer(library, db), _Worker(), _Recorder(), token=token)
+def _client(library, db, token=None, worker=None):
+    app = create_app(library, db, Importer(library, db), worker or _Worker(), _Recorder(), token=token)
     return TestClient(app)
 
 
@@ -52,3 +59,46 @@ def test_search_and_recordings(library, db):
     assert c.get("/api/search", params={"q": "pastel"}).json()[0]["recording_id"] == rid
     r = c.patch(f"/api/recordings/{rid}", json={"title": "Design review"})
     assert r.status_code == 200 and db.get_recording(rid)["title"] == "Design review"
+
+
+def test_summary_templates_listed(library, db):
+    c = _client(library, db)
+    body = c.get("/api/summary/templates").json()
+    ids = [t["id"] for t in body["templates"]]
+    assert "meeting" in ids and "interview" in ids and ids[-1] == "custom"
+    assert body["default"] == "meeting"
+    assert all(t["name"] for t in body["templates"])
+
+
+def test_summary_template_default_follows_settings(library, db):
+    library.update_settings({"summary_template": "lecture"})
+    assert _client(library, db).get("/api/summary/templates").json()["default"] == "lecture"
+    # A custom prompt that was never written is not a usable default.
+    library.update_settings({"summary_template": "custom"})
+    assert _client(library, db).get("/api/summary/templates").json()["default"] == "meeting"
+    library.update_settings({"summary_custom_prompt": "Two bullets."})
+    assert _client(library, db).get("/api/summary/templates").json()["default"] == "custom"
+
+
+def test_summarize_stores_the_chosen_template(library, db):
+    worker = _Worker()
+    rid = db.insert_recording(sha256="2" * 64, original_name="y.wav", rel_path="audio/y.wav", status="done")
+    c = _client(library, db, worker=worker)
+
+    assert c.post(f"/api/recordings/{rid}/summarize", json={"template": "interview"}).status_code == 200
+    assert db.get_recording(rid)["summary_template"] == "interview"
+    assert worker.queued == [rid]
+
+    # No template in the body keeps whatever the recording already uses.
+    assert c.post(f"/api/recordings/{rid}/summarize", json={}).status_code == 200
+    assert db.get_recording(rid)["summary_template"] == "interview"
+
+    bad = c.post(f"/api/recordings/{rid}/summarize", json={"template": "nonsense"})
+    assert bad.status_code == 400
+    assert db.get_recording(rid)["summary_template"] == "interview", "a bad template must not overwrite the good one"
+
+
+def test_summarize_requires_a_processed_recording(library, db):
+    rid = db.insert_recording(sha256="3" * 64, original_name="z.wav", rel_path="audio/z.wav", status="queued")
+    assert _client(library, db).post(f"/api/recordings/{rid}/summarize", json={}).status_code == 409
+    assert _client(library, db).post("/api/recordings/9999/summarize", json={}).status_code == 404

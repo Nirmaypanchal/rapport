@@ -68,6 +68,8 @@ class Settings:
     summary_provider: str = "auto"   # auto | ollama | mlx | off
     summary_model: str = ""          # "" = provider default
     auto_summarize: bool = True      # summarize each recording right after processing
+    summary_template: str = "meeting"  # default shape for new summaries; a recording can override it
+    summary_custom_prompt: str = ""    # used when summary_template is "custom"
 
     # Playback
     skip_silence_min_gap: float = 0.7  # pauses shorter than this are kept (seconds)
