@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { toast } from "sonner";
 import { ArrowLeft, Download, FileText, RefreshCw, Scissors, Trash2 } from "lucide-react";
-import { api, fetcher, urls, type Recording } from "@/lib/api";
+import { api, exportRecording, fetcher, urls, type Recording } from "@/lib/api";
+import { useConfirm } from "@/components/confirm";
 import { fmtClock, fmtDate, fmtDur, fmtTime, recordingTitle } from "@/lib/format";
 import { usePlayer } from "@/lib/use-player";
 import { useStatus } from "@/lib/use-status";
@@ -24,6 +25,7 @@ const LS_TAB = "recordingTab";
 
 export function RecordingDetail({ id, seekTo, onListChanged }: { id: number; seekTo?: number; onListChanged: () => void }) {
   const router = useRouter();
+  const { confirm } = useConfirm();
   const { data: status } = useStatus();
   const { data: r, mutate } = useSWR<Recording>(`/api/recordings/${id}`, fetcher, {
     refreshInterval: (d) => (d && ((d.status !== "done" && d.status !== "error") || d.summary_status === "queued" || d.summary_status === "running") ? 2000 : 0),
@@ -65,6 +67,11 @@ export function RecordingDetail({ id, seekTo, onListChanged }: { id: number; see
   const minGap = status?.settings.skip_silence_min_gap ?? 0.7;
   const pad = status?.settings.skip_silence_pad ?? 0.15;
   const pick = (t: string) => { const v = t as Tab; setTab(v); try { localStorage.setItem(LS_TAB, v); } catch {} };
+  const doExport = async (kind: "transcript" | "original" | "condensed") => {
+    toast(kind === "condensed" ? "Exporting… (cutting pauses)" : "Exporting…");
+    try { const res = await exportRecording(id, kind); toast(`Saved to ${res.path.replace(/^\/Users\/[^/]+/, "~")}`); }
+    catch (e) { toast(`Export failed: ${(e as Error).message}`); }
+  };
 
   return (
     <div className="grid h-full grid-rows-[1fr_auto]">
@@ -86,7 +93,7 @@ export function RecordingDetail({ id, seekTo, onListChanged }: { id: number; see
               {r.status === "error" ? <span>⚠︎</span> : <span className="blink size-2 rounded-full bg-signal" />}
               <span className="flex-1">{r.status === "error" ? `Processing failed: ${r.error}` : r.status === "processing" ? `${r.stage || "Starting"}` : "Waiting in queue…"}</span>
               {r.status === "processing" && typeof r.progress === "number" && <span className="tc text-[12.5px] text-ink-3">{Math.round(r.progress * 100)}%</span>}
-              {r.status === "error" && <Button size="sm" variant="outline" onClick={() => reprocess(r, mutate, onListChanged, true)}>Retry</Button>}
+              {r.status === "error" && <Button size="sm" variant="outline" onClick={() => reprocess(r, mutate, onListChanged, confirm, true)}>Retry</Button>}
             </div>
             {r.status === "processing" && <Progress value={r.progress} className="mt-3" />}
           </div>
@@ -122,12 +129,12 @@ export function RecordingDetail({ id, seekTo, onListChanged }: { id: number; see
 
             <TabsContent value="actions" keepMounted className="mt-4">
               <div className="mx-auto grid max-w-[720px] gap-2">
-                <Action icon={<FileText className="size-4" />} title="Export transcript" desc="Plain text with timecodes and speaker names." href={urls.transcript(id)} newTab />
-                {hasAudio && <Action icon={<Download className="size-4" />} title="Download original audio" desc={`The untouched file (${r.original_name}).`} href={urls.original(id)} />}
-                {hasAudio && <Action icon={<Scissors className="size-4" />} title="Download condensed audio" desc={`An .m4a with pauses longer than ${minGap}s cut out.`} href={urls.condensed(id, minGap, pad)} />}
-                {hasAudio && <Action icon={<RefreshCw className="size-4" />} title="Re-process" desc="Run transcription and speaker detection again. Manual corrections to turns are replaced." onClick={() => reprocess(r, mutate, onListChanged)} />}
-                <Action icon={<Trash2 className="size-4" />} title="Remove from library" desc="Deletes the transcript, speakers and summary. The original WAV stays on disk." danger onClick={async () => {
-                  if (!confirm(`Remove "${recordingTitle(r)}" from the library?\n\nThe transcript and speaker data are deleted. The original WAV stays on disk.`)) return;
+                <Action icon={<FileText className="size-4" />} title="Export transcript" desc="Plain text with timecodes and speaker names, saved to Downloads/Rapport." onClick={() => doExport("transcript")} />
+                {hasAudio && <Action icon={<Download className="size-4" />} title="Export original audio" desc={`A copy of the untouched file (${r.original_name}), saved to Downloads/Rapport.`} onClick={() => doExport("original")} />}
+                {hasAudio && <Action icon={<Scissors className="size-4" />} title="Export condensed audio" desc={`An .m4a with pauses longer than ${minGap}s cut out, saved to Downloads/Rapport.`} onClick={() => doExport("condensed")} />}
+                {hasAudio && <Action icon={<RefreshCw className="size-4" />} title="Re-process" desc="Run transcription and speaker detection again. Manual corrections to turns are replaced." onClick={() => reprocess(r, mutate, onListChanged, confirm)} />}
+                <Action icon={<Trash2 className="size-4" />} title="Remove from library" desc="Deletes the transcript, speakers and summary. The original audio stays on disk." danger onClick={async () => {
+                  if (!(await confirm({ title: `Remove "${recordingTitle(r)}"?`, description: "The transcript, speakers and summary are deleted. The original audio file stays in the library folder.", confirmLabel: "Remove", destructive: true }))) return;
                   await api(`/api/recordings/${id}`, { method: "DELETE" }); toast("Removed"); onListChanged(); router.push("/");
                 }} />
               </div>
@@ -191,8 +198,8 @@ function Action({ icon, title, desc, href, newTab, onClick, danger }: { icon: Re
   return href ? <a href={href} target={newTab ? "_blank" : undefined} rel={newTab ? "noreferrer" : undefined} className={cls}>{body}</a> : <button type="button" onClick={onClick} className={cn(cls, "w-full")}>{body}</button>;
 }
 
-async function reprocess(r: Recording, mutate: () => void, onListChanged: () => void, silent = false) {
-  if (!silent && r.status === "done" && !confirm("Re-run transcription and speaker detection?\n\nManual corrections to turns (speakers, splits, text edits) will be replaced.")) return;
+async function reprocess(r: Recording, mutate: () => void, onListChanged: () => void, confirm: (o: { title: string; description?: string; confirmLabel?: string; destructive?: boolean }) => Promise<boolean>, silent = false) {
+  if (!silent && r.status === "done" && !(await confirm({ title: "Re-process this recording?", description: "Transcription and speaker detection run again from the audio. Manual corrections to turns (speakers, splits, text edits) are replaced.", confirmLabel: "Re-process" }))) return;
   await api(`/api/recordings/${r.id}/reprocess`, { method: "POST" });
   toast("Queued for processing");
   mutate();

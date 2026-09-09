@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { useConfirm } from "@/components/confirm";
 
 export function PeopleView() {
   const params = useSearchParams();
@@ -73,6 +74,7 @@ export function PeopleView() {
 }
 
 function PersonRow({ p, people, selected, onChange }: { p: Person; people: Person[]; selected: boolean; onChange: () => void }) {
+  const { confirm } = useConfirm();
   const [name, setName] = useState(p.name);
   const others = people.filter((x) => x.id !== p.id);
   return (
@@ -92,7 +94,7 @@ function PersonRow({ p, people, selected, onChange }: { p: Person; people: Perso
       <td className="px-3 py-2.5 text-[12.5px] text-ink-2">{p.last_heard ? fmtDate(p.last_heard) : "—"}</td>
       <td className="px-3 py-2.5 text-right">
         <div className="flex items-center justify-end gap-1.5">
-          <Select value="" onValueChange={async (v) => { if (!v) return; const keep = Number(v); const target = others.find((o) => o.id === keep)!; if (!confirm(`Merge “${p.name}” into “${target.name}”?\n\nAll of ${p.name}'s appearances will belong to ${target.name}.`)) return; await api(`/api/people/${keep}/merge/${p.id}`, { method: "POST" }); toast("Merged"); onChange(); }}>
+          <Select value="" onValueChange={async (v) => { if (!v) return; const keep = Number(v); const target = others.find((o) => o.id === keep)!; if (!(await confirm({ title: `Merge “${p.name}” into “${target.name}”?`, description: `All of ${p.name}'s appearances will belong to ${target.name}. This can't be undone.`, confirmLabel: "Merge" }))) return; await api(`/api/people/${keep}/merge/${p.id}`, { method: "POST" }); toast("Merged"); onChange(); }}>
             <SelectTrigger size="sm" className="h-7 text-[12px]"><SelectValue placeholder="Merge into…" /></SelectTrigger>
             <SelectContent>{others.map((o) => <SelectItem key={o.id} value={String(o.id)}>{o.name}</SelectItem>)}</SelectContent>
           </Select>
@@ -105,6 +107,7 @@ function PersonRow({ p, people, selected, onChange }: { p: Person; people: Perso
 
 
 function ResetSpeakers({ onDone }: { onDone: () => void }) {
+  const { confirm } = useConfirm();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const run = async (mode: "rematch" | "reprocess") => {
@@ -127,7 +130,7 @@ function ResetSpeakers({ onDone }: { onDone: () => void }) {
               <div className="font-semibold">Re-match voices <span className="ml-2 rounded-full bg-good-soft px-2 py-px text-[11px] text-good">seconds</span></div>
               <div className="mt-1 text-ink-2">Forgets all people, then groups the voices again from the fingerprints already stored, oldest recording first. Transcripts and your turn corrections stay as they are.{busy === "rematch" ? " Working…" : ""}</div>
             </button>
-            <button type="button" disabled={!!busy} onClick={() => { if (confirm("Re-process every recording?\n\nThis re-runs transcription and speaker detection from the audio. Manual turn corrections are replaced. It takes a few minutes per hour of audio.")) run("reprocess"); }} className="rounded-lg border border-hairline bg-surface p-4 text-left transition-colors hover:border-clip disabled:opacity-50">
+            <button type="button" disabled={!!busy} onClick={async () => { if (await confirm({ title: "Re-process every recording?", description: "This re-runs transcription and speaker detection from the audio. Manual turn corrections are replaced. It takes a few minutes per hour of audio.", confirmLabel: "Re-process all", destructive: true })) run("reprocess"); }} className="rounded-lg border border-hairline bg-surface p-4 text-left transition-colors hover:border-clip disabled:opacity-50">
               <div className="font-semibold">Re-process everything <span className="ml-2 rounded-full bg-warn-soft px-2 py-px text-[11px] text-warn">slow</span></div>
               <div className="mt-1 text-ink-2">Forgets all people and re-runs speaker detection on the audio of every recording. Use this if the speaker turns themselves are wrong, not just the names.{busy === "reprocess" ? " Queuing…" : ""}</div>
             </button>

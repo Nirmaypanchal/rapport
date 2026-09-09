@@ -61,6 +61,10 @@ class VoiceMemoImport(BaseModel):
     uids: list[str] | None = None
 
 
+class ExportBody(BaseModel):
+    kind: str
+
+
 class PeopleReset(BaseModel):
     mode: str = "rematch"
 
@@ -219,7 +223,12 @@ def create_app(library: Library, db: Database, importer: Importer, worker, recor
             "reveal-python": ["open", "-R", os.environ.get("RAPPORT_APP_PATH") or python_executable()],
             "voicememos-app": ["open", "-a", "Voice Memos"],
         }
-        if body.target.startswith("reveal:"):
+        if body.target.startswith("url:"):
+            url = body.target[4:]
+            if not url.startswith(("http://", "https://")):
+                raise HTTPException(400, "only http(s) links")
+            cmd = ["open", url]
+        elif body.target.startswith("reveal:"):
             p = Path(body.target[7:]).expanduser()
             if not p.exists():
                 raise HTTPException(404, "path not found")
@@ -490,7 +499,7 @@ def create_app(library: Library, db: Database, importer: Importer, worker, recor
         cache = library.recording_cache(rid)
         if not (cache / "audio16k.wav").exists():
             raise HTTPException(409, "recording not processed yet")
-        return {"duration": r["duration_sec"], "regions": worker.models.speech_map(cache)}
+        return {"duration": r["duration_sec"], "regions": worker_models_speech(cache)}
 
     @app.get("/api/recordings/{rid}/condensed")
     def condensed(rid: int, min_gap: float = 0.7, pad: float = 0.15):
@@ -502,7 +511,7 @@ def create_app(library: Library, db: Database, importer: Importer, worker, recor
         cache = library.recording_cache(rid)
         if not (cache / "audio16k.wav").exists():
             raise HTTPException(409, "recording not processed yet")
-        keep = condense_regions(worker.models.speech_map(cache), r["duration_sec"] or 0, min_gap, pad)
+        keep = condense_regions(worker_models_speech(cache), r["duration_sec"] or 0, min_gap, pad)
         dst = cache / f"condensed_{min_gap:g}_{pad:g}.m4a"
         try:
             export_condensed(library.root / r["rel_path"], dst, keep)
@@ -510,6 +519,61 @@ def create_app(library: Library, db: Database, importer: Importer, worker, recor
             raise HTTPException(400, str(e))
         base = Path(r["original_name"]).stem
         return FileResponse(dst, media_type="audio/mp4", filename=f"{base}_condensed.m4a")
+
+    @app.post("/api/recordings/{rid}/export")
+    def export_recording(rid: int, body: ExportBody):
+        """Write an export to ~/Downloads/Rapport and reveal it in Finder (downloads don't work inside the desktop WebView)."""
+        import shutil
+        import subprocess
+
+        r = db.get_recording(rid)
+        if not r:
+            raise HTTPException(404)
+        out_dir = Path.home() / "Downloads" / "Rapport"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        base = "".join(ch if ch.isalnum() or ch in " -_()" else "_" for ch in (r.get("title") or Path(r["original_name"]).stem)).strip() or f"recording-{rid}"
+        if body.kind == "transcript":
+            names = {sp["label"]: (sp["person_name"] or sp.get("display_name") or sp["label"]) for sp in db.get_speakers(rid)}
+            lines = [f"# {r.get('title') or r['original_name']}  ({r.get('recorded_at')})", ""]
+            for seg in db.get_segments(rid):
+                m, sec = divmod(int(seg["start"]), 60)
+                lines.append(f"[{m:02d}:{sec:02d}] {names.get(seg['speaker_label'], seg['speaker_label'])}: {seg['text']}")
+            dst = out_dir / f"{base}.txt"
+            dst.write_text("\n".join(lines) + "\n")
+        elif body.kind == "original":
+            if not r.get("rel_path"):
+                raise HTTPException(400, "this recording has no audio")
+            src = library.root / r["rel_path"]
+            dst = out_dir / f"{base}{src.suffix}"
+            shutil.copyfile(src, dst)
+        elif body.kind == "condensed":
+            from .audio import condense_regions, export_condensed
+
+            if not r.get("rel_path"):
+                raise HTTPException(400, "this recording has no audio")
+            cache = library.recording_cache(rid)
+            s_ = library.settings
+            keep = condense_regions(worker_models_speech(cache), r["duration_sec"] or 0, s_.skip_silence_min_gap, s_.skip_silence_pad)
+            tmp = cache / f"condensed_{s_.skip_silence_min_gap:g}_{s_.skip_silence_pad:g}.m4a"
+            export_condensed(library.root / r["rel_path"], tmp, keep)
+            dst = out_dir / f"{base} (condensed).m4a"
+            shutil.copyfile(tmp, dst)
+        else:
+            raise HTTPException(400, "unknown export kind")
+        subprocess.run(["open", "-R", str(dst)], capture_output=True, timeout=10)
+        return {"path": str(dst)}
+
+    def worker_models_speech(cache: Path):
+        """Speech map without the worker: compute here if the cache lacks it (VAD is small)."""
+        f = cache / "speech.json"
+        if f.exists():
+            return [tuple(x) for x in json.loads(f.read_text())]
+        from .audio import load_wav16k
+        from .diarize import load_vad, speech_regions
+
+        regions = speech_regions(load_wav16k(cache / "audio16k.wav"), load_vad())
+        f.write_text(json.dumps([[round(a, 3), round(b, 3)] for a, b in regions]))
+        return regions
 
     @app.get("/api/recordings/{rid}/transcript.txt")
     def transcript_txt(rid: int):

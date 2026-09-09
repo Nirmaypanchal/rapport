@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
-import { api, fetcher, type LogLine, type Settings } from "@/lib/api";
+import { api, fetcher, openExternal, type LogLine, type Settings } from "@/lib/api";
 
 type Providers = { ollama: string[]; mlx_default: string; active: { provider: string; model: string } | null };
 import { useStatus } from "@/lib/use-status";
@@ -69,7 +69,7 @@ export function SettingsView() {
         <div className={cn("rounded-lg border-l-2 bg-surface px-4 py-3 text-[13px]", m.pyannote_loaded ? "border-good" : "border-warn")}>
           {m.pyannote_loaded ? "Using pyannote's diarization pipeline (best quality)." : m.pyannote_error ? (
             <div>
-              <b>Using the built-in speaker engine.</b> pyannote's better diarizer is gated on Hugging Face. To unlock it, sign in at huggingface.co, accept the terms on <a className="underline" href="https://huggingface.co/pyannote/speaker-diarization-community-1" target="_blank" rel="noreferrer">speaker-diarization-community-1</a> and <a className="underline" href="https://huggingface.co/pyannote/segmentation-3.0" target="_blank" rel="noreferrer">segmentation-3.0</a>, then paste a read token below.
+              <b>Using the built-in speaker engine.</b> pyannote's better diarizer is gated on Hugging Face. To unlock it, sign in at huggingface.co, accept the terms on <button type="button" className="underline" onClick={() => openExternal("https://huggingface.co/pyannote/speaker-diarization-community-1")}>speaker-diarization-community-1</button> and <button type="button" className="underline" onClick={() => openExternal("https://huggingface.co/pyannote/segmentation-3.0")}>segmentation-3.0</button>, then paste a read token below.
               <div className="tc mt-1 text-[11.5px] text-ink-3">Last error: {m.pyannote_error}</div>
             </div>
           ) : "The speaker engine loads with the first recording."}

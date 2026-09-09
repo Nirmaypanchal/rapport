@@ -13,6 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { useConfirm } from "@/components/confirm";
 
 /* ---------------------------------------------------------------- brand marks */
 type Mark = { kind: "si"; path: string; hex: string } | { kind: "img"; src: string; fallback?: Mark } | { kind: "icon"; icon: React.ComponentType<{ className?: string; strokeWidth?: number }> };
@@ -255,6 +256,7 @@ function VoiceMemosPanel({ vm, auto, onAuto, onChange, onRecheck }: { vm: Omit<V
 }
 
 function MemoPicker({ memos, imported, auto, onAuto, busy, setBusy, onImported }: { memos: VoiceMemosStatus["memos"]; imported: number; auto: boolean; onAuto: (v: boolean) => void; busy: boolean; setBusy: (b: boolean) => void; onImported: () => void }) {
+  const { confirm } = useConfirm();
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [q, setQ] = useState("");
   const shown = memos.filter((m) => !q.trim() || m.title.toLowerCase().includes(q.trim().toLowerCase()));
@@ -294,7 +296,7 @@ function MemoPicker({ memos, imported, auto, onAuto, busy, setBusy, onImported }
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Button size="sm" disabled={busy || sel.size === 0} onClick={() => run([...sel])}>{busy ? "Importing…" : `Import selected${sel.size ? ` (${sel.size})` : ""}`}</Button>
-            <Button size="sm" variant="outline" disabled={busy} onClick={() => { if (confirm(`Import all ${memos.length} memos?`)) run(null); }}>Import all new</Button>
+            <Button size="sm" variant="outline" disabled={busy} onClick={async () => { if (await confirm({ title: `Import all ${memos.length} memos?`, description: "They are copied into the library and queued for transcription. Nothing changes in Voice Memos.", confirmLabel: "Import all" })) run(null); }}>Import all new</Button>
           </div>
         </>
       )}
@@ -370,6 +372,7 @@ function FolderPanel({ kind, root, s, save }: { kind: string; root?: { key: stri
 }
 
 function FilesPanel() {
+  const { promptText } = useConfirm();
   const ref = useRef<HTMLInputElement>(null);
   return (
     <div>
@@ -377,7 +380,7 @@ function FilesPanel() {
       <input ref={ref} type="file" accept="audio/*,.wav,.m4a,.mp3,.aac,.flac,.aif,.aiff" multiple className="hidden" onChange={async (e) => { const files = Array.from(e.target.files ?? []); e.target.value = ""; if (!files.length) return; toast(`Importing ${files.length}…`); try { const r = await uploadFiles(files); toast(r.imported.length ? `Imported ${r.imported.length}, queued` : "Nothing new: already in the library"); } catch (err) { toast(`Import failed: ${(err as Error).message}`); } }} />
       <div className="mt-4 flex flex-wrap gap-2">
         <Button onClick={() => ref.current?.click()}><Download className="size-4" />Choose files…</Button>
-        <Button variant="outline" onClick={async () => { const p = prompt("Folder or file path to import once:"); if (!p) return; const r = await api<{ imported: number[] }>("/api/import/path", { method: "POST", json: { path: p } }); toast(`Imported ${r.imported.length} file(s)`); }}>Import a folder once…</Button>
+        <Button variant="outline" onClick={async () => { const p = await promptText({ title: "Import a folder once", description: "Every audio file in the folder is copied into the library. The folder itself is untouched.", placeholder: "~/Recordings", confirmLabel: "Import" }); if (!p) return; try { const r = await api<{ imported: number[] }>("/api/import/path", { method: "POST", json: { path: p } }); toast(r.imported.length ? `Imported ${r.imported.length} file(s)` : "Nothing new in that folder"); } catch (e) { toast((e as Error).message); } }}>Import a folder once…</Button>
       </div>
       <div className="mt-4 flex items-center gap-2 text-[12px] text-ink-3"><Mic className="size-3.5" />Tip: you can also drop files anywhere on the Recordings list.</div>
     </div>

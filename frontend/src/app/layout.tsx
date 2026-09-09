@@ -3,6 +3,7 @@ import { Bricolage_Grotesque, IBM_Plex_Mono, Schibsted_Grotesk } from "next/font
 import "./globals.css";
 import { Shell } from "@/components/shell";
 import { Toaster } from "@/components/ui/sonner";
+import { ConfirmProvider } from "@/components/confirm";
 
 const ui = Schibsted_Grotesk({ variable: "--font-ui", subsets: ["latin"], weight: ["400", "500", "600", "700"], display: "swap" });
 const display = Bricolage_Grotesque({ variable: "--font-display", subsets: ["latin"], weight: ["500", "600", "700"], display: "swap" });
@@ -28,7 +29,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${ui.variable} ${display.variable} ${mono.variable} h-full`}>
       <body className="h-full">
-        <Shell>{children}</Shell>
+        <ConfirmProvider>
+          <Shell>{children}</Shell>
+        </ConfirmProvider>
         <Toaster position="bottom-center" />
       </body>
     </html>

@@ -207,3 +207,15 @@ export const urls = {
   transcript: (id: number) => withToken(`${API}/api/recordings/${id}/transcript.txt`),
   condensed: (id: number, minGap: number, pad: number) => withToken(`${API}/api/recordings/${id}/condensed?min_gap=${minGap}&pad=${pad}`),
 };
+
+
+/** Open a web page in the user's default browser. Inside the desktop WebView, target="_blank" does nothing, so the backend opens it. */
+export async function openExternal(url: string): Promise<void> {
+  if (TOKEN) { await api("/api/system/open", { method: "POST", json: { target: `url:${url}` } }); return; }
+  window.open(url, "_blank", "noopener");
+}
+
+/** Save an export (transcript, original audio, condensed audio) to ~/Downloads/Rapport and reveal it in Finder. */
+export async function exportRecording(id: number, kind: "transcript" | "original" | "condensed"): Promise<{ path: string }> {
+  return api(`/api/recordings/${id}/export`, { method: "POST", json: { kind } });
+}
