@@ -27,7 +27,7 @@ for pkg in ["torch", "torchaudio", "transformers", "tokenizers", "huggingface_hu
         pass
 hiddenimports += ["uvicorn.logging", "uvicorn.loops", "uvicorn.loops.auto", "uvicorn.protocols", "uvicorn.protocols.http", "uvicorn.protocols.http.auto",
                   "uvicorn.protocols.websockets", "uvicorn.protocols.websockets.auto", "uvicorn.lifespan", "uvicorn.lifespan.on", "multipart", "python_multipart",
-                  "dji_mic_app.sidecar", "sklearn.cluster", "sklearn.utils._typedefs", "sklearn.neighbors._partition_nodes", "scipy.special._cdflib"]
+                  "rapport.sidecar", "sklearn.cluster", "sklearn.utils._typedefs", "sklearn.neighbors._partition_nodes", "scipy.special._cdflib"]
 
 # Static ffmpeg/ffprobe travel in bin/ next to the executable.
 binaries += [(str(BIN / "ffmpeg"), "bin"), (str(BIN / "ffprobe"), "bin")]

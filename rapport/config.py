@@ -2,7 +2,7 @@
 
 Everything the app owns lives inside one folder (the "library"):
 
-    ~/DJI Mic Library/
+    ~/Rapport/  (or ~/DJI Mic Library for libraries created before the rename)
         audio/YYYY/YYYY-MM-DD/<original file name>.wav   <- untouched originals (the backup)
         cache/<recording id>/                             <- 16k wav, playback m4a, waveform peaks
         library.sqlite                                    <- transcripts, speakers, people
@@ -18,7 +18,16 @@ import threading
 from dataclasses import dataclass, asdict, field
 from pathlib import Path
 
-DEFAULT_LIBRARY = Path(os.environ.get("DJI_MIC_LIBRARY", Path.home() / "DJI Mic Library"))
+def _default_library() -> Path:
+    """Existing users keep ~/DJI Mic Library; new installs use ~/Rapport. RAPPORT_LIBRARY overrides both."""
+    env = os.environ.get("RAPPORT_LIBRARY") or os.environ.get("DJI_MIC_LIBRARY")
+    if env:
+        return Path(env)
+    legacy = Path.home() / "DJI Mic Library"
+    return legacy if (legacy / "library.sqlite").exists() else Path.home() / "Rapport"
+
+
+DEFAULT_LIBRARY = _default_library()
 
 
 @dataclass

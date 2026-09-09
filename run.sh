@@ -11,4 +11,4 @@ if command -v npm >/dev/null 2>&1 && [ -d frontend ]; then
     echo "Building UI…"; (cd frontend && [ -d node_modules ] || npm install --no-audit --no-fund; npm run build >/dev/null)
   fi
 fi
-exec .venv/bin/python -m dji_mic_app.main "$@"
+exec .venv/bin/python -m rapport.main "$@"

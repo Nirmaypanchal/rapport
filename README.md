@@ -1,185 +1,97 @@
-# Voice Library
+# Rapport
 
-A local Mac app that gathers every voice recording you make (DJI Mic, any USB recorder, a microphone,
-Voice Memos, Omi, Granola, Notion…) into one searchable library. Plug a DJI transmitter in and it will:
+**Every voice note and meeting you record, in one library on your Mac.** Rapport imports from the
+devices and apps you already use (iPhone Voice Memos, AirPods, DJI Mic, any USB recorder, Granola,
+Notion, Omi, iCloud Drive…), transcribes on-device with Whisper, works out who said what across all
+your recordings, writes summaries with a local model, and makes everything searchable.
+Nothing is uploaded. No account. No subscription. MIT licensed.
 
-1. **Import** every new recording from the mic into `~/DJI Mic Library/audio/YYYY/YYYY-MM-DD/`
-   and verify the copy byte-for-byte (SHA-256). Files already in the library are skipped by hash, and the
-   mic is never cleared unless you switch that on in Settings. The originals in the library are never modified.
-2. **Transcribe** it on-device with Whisper (`mlx-whisper`, Apple silicon GPU), with word timestamps.
-3. **Find the speakers** (who spoke when) and compute a voice embedding for each one.
-4. **Recognise people across recordings**: a new voice becomes "Speaker N"; rename it once
-   and every later recording with that voice is labelled with the name automatically.
-5. Show everything in a browser UI: waveform player, speaker-coloured transcript with
-   click-to-seek and live word highlighting, people directory, full-text search across
-   all transcripts, plain-text transcript export.
+> The best device for recording notes is the one you already have.
 
-Nothing leaves your Mac. Models are downloaded once from Hugging Face and cached.
+- **Local AI note taker for macOS.** Transcription, speaker recognition and summaries run on Apple silicon
+  with open models (Whisper via MLX, WeSpeaker voice embeddings, Ollama or MLX LLMs). Your audio never leaves the machine.
+- **One library for every recorder.** DJI Mic transmitters, Zoom/Tascam/Sony recorders and SD cards, the Mac's
+  microphone, AirPods and any Bluetooth mic, Apple Voice Memos synced from iPhone and Apple Watch, the Omi pendant,
+  plus transcripts from Granola and Notion AI Meeting Notes.
+- **Knows who's talking, across recordings.** Every voice gets a fingerprint. Name a person once and every future
+  recording with that voice carries the name. Fix mistakes in place: rename, reassign, split or merge turns.
+- **Search everything you ever said or heard.** Full-text search across all transcripts opens the recording at that second.
+- **Summaries with your own model.** Ollama if it's running, otherwise a small MLX model downloaded once. No API keys.
+- **Plain files you can see.** Originals, transcripts, people and settings live in one folder you can back up or delete.
 
-## Run
+![Rapport: a recording with speaker-labelled transcript, waveform and speaker lane](docs/screenshots/recording.png)
+
+<p align="center"><img src="docs/screenshots/sources.png" width="49%" alt="Sources: devices and integrations"> <img src="docs/screenshots/people.png" width="49%" alt="People recognized across recordings"></p>
+
+## Install
+
+**Download the Mac app** from [Releases](https://github.com/Nirmaypanchal/rapport/releases) (macOS 14+, Apple silicon),
+open `Rapport.app`, and plug in a recorder or drop an audio file on the Recordings list. Models download on first use
+(about 2 GB). The build is unsigned for now, so on first launch right-click the app and choose Open.
+
+**Or run from source** (needs [uv](https://docs.astral.sh/uv/), ffmpeg and Node 20+):
 
 ```bash
-./run.sh
+brew install uv ffmpeg node
+git clone https://github.com/Nirmaypanchal/rapport && cd rapport
+./run.sh          # opens http://127.0.0.1:8765
 ```
 
-Then open http://127.0.0.1:8765 (it opens automatically). Leave it running; it watches
-`/Volumes` every few seconds for a DJI transmitter.
+Full instructions, including the desktop build: [docs/getting-started.md](docs/getting-started.md).
 
-Requirements: macOS on Apple silicon, [uv](https://docs.astral.sh/uv/), ffmpeg and Node 20+
-(`brew install uv ffmpeg node`). The first run installs the Python environment, builds the UI, and
-downloads ~1.6 GB of models.
+## What it does with a recording
 
-To start it automatically at login:
+1. **Import.** New files are copied into the library and verified byte-for-byte. Duplicates are skipped by hash.
+   Devices are never written to unless you turn on "clear the mic after import".
+2. **Transcribe.** Whisper large-v3-turbo on MLX, with word-level timestamps, in 100+ languages.
+   A 3-minute recording takes about a minute on an M1 Pro.
+3. **Find the speakers.** Voice activity detection, voice embeddings and clustering give you who spoke when.
+   pyannote's diarization pipeline is used automatically if you've accepted its Hugging Face terms.
+4. **Recognize people.** Each speaker's voice fingerprint is compared with everyone heard before.
+   Matches get the name; new voices become "Speaker N" until you name them.
+5. **Summarize.** Summary, key points, action items and quotes, from a model on your Mac.
+6. **Browse.** Waveform with a speaker lane, transcript with live word highlight, skip silences, export.
 
-```bash
-./scripts/install_launchd.sh      # ./scripts/install_launchd.sh --remove to undo
-```
+Details: [docs/how-it-works.md](docs/how-it-works.md).
 
-## Where things live
+## Works with
 
-Everything is in one folder, `~/DJI Mic Library` (override with `DJI_MIC_LIBRARY=/path`):
-
-| Path | What |
+| Devices | Apps and services |
 |---|---|
-| `audio/YYYY/YYYY-MM-DD/*.wav` | untouched original recordings, your backup |
-| `library.sqlite` | transcripts, speakers, people, notes |
-| `cache/<id>/` | 16 kHz copy, playback `.m4a`, waveform peaks (safe to delete, rebuilt on re-process) |
-| `settings.json` | settings, also editable in the UI |
+| Apple Voice Memos (Mac, iPhone, Apple Watch via iCloud) | Granola |
+| AirPods and any Bluetooth or USB microphone | Notion AI Meeting Notes |
+| iPhone as a microphone via Continuity | Omi pendant |
+| DJI Mic Mini, Mic 2, Mic 3 and other USB-mounted recorders | iCloud Drive, Dropbox, Google Drive folders |
+| Zoom, Tascam, Sony recorders and SD cards | Otter, Plaud, Pocket and other exports (drop the files) |
 
-Back up that folder and you have everything.
+Missing yours? [Open a device request](https://github.com/Nirmaypanchal/rapport/issues/new?template=device_request.md)
+or add a connector: [docs/developers.md](docs/developers.md).
 
-## Speaker engine
+## Documentation
 
-Two engines exist; the app picks automatically:
+- [Getting started](docs/getting-started.md): install, first import, permissions (Voice Memos, microphone)
+- [How it works](docs/how-it-works.md): the pipeline, the models, what runs where
+- [Devices](docs/devices.md): every recorder we know about and how it connects
+- [Integrations](docs/integrations.md): Granola, Notion, Omi, cloud folders, exports
+- [Use cases](docs/use-cases.md): interviews, user research, lectures, coaching, sales, field notes, journaling
+- [Compared to Otter, Fireflies, Granola, MacWhisper, Plaud](docs/comparison.md)
+- [Privacy](docs/privacy.md): exactly what touches the network, and what doesn't
+- [FAQ](docs/faq.md) and [Troubleshooting](docs/troubleshooting.md)
+- [For developers](docs/developers.md): architecture, API, adding sources and summarizers, desktop build
+- [Roadmap](docs/roadmap.md): people memory, MCP server, ask-your-library
 
-* **Built-in** (works out of the box, no accounts): Silero VAD + WeSpeaker voice embeddings +
-  clustering. Good for the 1-4 clean lavalier voices a DJI mic records.
-* **pyannote** (better turn boundaries and overlap handling): its models are gated on Hugging Face.
-  Accept the terms on [pyannote/speaker-diarization-community-1](https://huggingface.co/pyannote/speaker-diarization-community-1)
-  and [pyannote/segmentation-3.0](https://huggingface.co/pyannote/segmentation-3.0) with your
-  Hugging Face account, make sure a read token is available (`huggingface-cli login` or paste it
-  in Settings), and the app switches over on the next recording.
+## Why open source
 
-Cross-recording person matching always uses the same WeSpeaker embedding, so switching engines
-does not invalidate the people you have already named.
+Your conversations are the most personal data you have. The only way to trust a tool with them is to be able to
+read it, run it yourself, and keep it working forever. Rapport is MIT licensed; use it, fork it, build on it.
+If you make something with it, tell us in [Discussions](https://github.com/Nirmaypanchal/rapport/discussions).
 
-## Tuning
+## Contributing
 
-In **Activity & Settings**:
+See [CONTRIBUTING.md](CONTRIBUTING.md). Good first contributions: a device you own that doesn't import yet,
+a summary template, a language you speak, a doc page that confused you.
 
-* *Voice match threshold* (default 0.60): cosine similarity needed to link a voice to a known person.
-  If the same person keeps showing up as a new "Speaker N", lower it; if different people get merged, raise it.
-* *Split sensitivity* (built-in engine, default 0.55): lower finds more speakers in one file.
-* *Whisper model*: `large-v3-turbo` is the sweet spot; `small`/`base` are much faster for drafts.
+## License
 
-Fixing mistakes never needs re-processing: click a speaker chip in a recording to rename the
-person, assign the voice to someone else, or create a new person. Merge duplicates on the People page.
-
-## Sources: devices and integrations
-
-The **Sources** page is where recorders and note-takers plug in. Audio is copied into the library
-and processed here; transcripts from other apps are imported as text (no player, everything else works).
-
-| Source | How |
-|---|---|
-| DJI Mic transmitters | Plug in over USB. New files detected, copied, verified. |
-| Any USB recorder, SD card, drive | Plug in and switch it on in Sources. Copied from, never deleted. |
-| Microphone, Bluetooth mic, AirPods, iPhone (Continuity) | Pick the input and press Record. Saved as 48 kHz WAV. |
-| Apple Voice Memos, iPhone, Apple Watch | Grant Full Disk Access once; memos (including those synced through iCloud) are imported with titles and dates. |
-| Omi pendant | Paste a Developer API key (`omi_dev_…`). Conversations arrive with transcript, overview and action items. |
-| Granola | Paste an API key (`grn_…`, Business plan). Notes, transcripts and Granola's summary. |
-| Notion AI Meeting Notes | Paste an internal integration token, optionally a database ID. Pages with meeting-notes blocks. |
-| Watched folders | Any folder (iCloud Drive, Dropbox, an export folder) is checked on every poll. |
-| Files and exports | Drop files on the Recordings list, or choose them in Sources. Otter, Plaud and Pocket exports work this way. |
-
-Integrations are read-only and sync every 10 minutes when a key is present; nothing is written back.
-Keys live in `settings.json` inside the library folder and never leave the Mac except to call that one service.
-
-## Desktop app (in progress)
-
-The macOS app is a Tauri 2 shell around a frozen copy of this backend. Step one is done:
-
-```bash
-./desktop/sidecar/build.sh     # PyInstaller one-dir bundle -> desktop/sidecar/dist/rapport-core/
-desktop/sidecar/dist/rapport-core/rapport-core --library ~/Rapport --token SECRET
-```
-
-The sidecar prints `READY <port>` once the API answers, requires the token on every request,
-and carries static ffmpeg/ffprobe in `bin/` so a clean Mac needs no Homebrew. Models still download
-from Hugging Face on first run.
-
-The shell lives in `desktop/app` (Tauri 2, Rust). It spawns the sidecar with a random token, shows a
-splash until `READY`, then points its window at the sidecar, which also serves the built UI.
-
-```bash
-cd desktop/app && npm install
-export PATH="$HOME/.cargo/bin:$PATH"     # Rust via rustup
-npx tauri dev                            # debug run against desktop/sidecar/dist and frontend/out
-npx tauri build --bundles app,dmg        # Rapport.app with the sidecar and UI inside (unsigned for now)
-```
-
-Existing users keep `~/DJI Mic Library`; new installs use `~/Rapport`. Next: signing and notarization,
-menu bar and dock state, start at login, updater.
-
-## Landing page
-
-`site/index.html` is the Rapport landing page, a single self-contained file. It deploys to
-Vercel as a static site: `vercel.json` points the output at `site/` and `.vercelignore` hides
-the rest of the repository, so Vercel never tries to build the Python app (which only runs on a Mac).
-
-## Correcting the transcript
-
-Speaker detection is occasionally wrong for a turn. Fix it in place; every correction is
-saved to the database and survives restarts:
-
-* Click the **speaker name** on a turn to pick who really said it (anyone in this recording,
-  any known person, or a brand-new person).
-* **Split at a word…** when the mistake starts mid-turn: click the word where the new turn
-  begins, then change that new turn's speaker.
-* **Merge with previous** joins a turn back into the one before it.
-* **Edit text** fixes transcription typos. Search picks up the new text immediately.
-
-Corrections do not retrain the voice model, and *Re-process* replaces them, so it asks first.
-
-## Skipping silences
-
-In the player, tick **Skip silences**: playback jumps over every pause longer than the
-configured minimum (default 0.7 s), the waveform dims the skipped parts, and the label shows how
-much time it saves. Timestamps in the transcript stay original. **Download condensed audio**
-exports the same thing as an `.m4a` with the pauses physically removed. Both thresholds are in
-Settings.
-
-## Importing older files
-
-Files you already copied off the mic: **Settings → Import from folder…**. They are copied into the
-library (never moved) and processed like everything else.
-
-## Developing the UI
-
-The interface is a Next.js app in `frontend/` (App Router, Tailwind v4, shadcn/ui on Base UI),
-styled from the Cue Sheet design tokens in `frontend/src/app/globals.css`. It is statically exported
-and served by the Python server, so distribution stays one process.
-
-```bash
-./run.sh                      # API + processing on :8765, serves frontend/out
-cd frontend && npm run dev    # hot-reloading UI on :3000, talking to the API on :8765
-npm run build                 # refresh frontend/out (run.sh does this when sources change)
-```
-
-## Layout
-
-```
-frontend/       Next.js UI (src/app pages, src/components, src/lib/api.ts types)
-dji_mic_app/
-  config.py     settings + library paths
-  db.py         SQLite schema and queries (FTS5 for search)
-  dji.py        detect DJI volumes, parse TXnn_MICnnn_YYYYMMDD_HHMMSS names
-  importer.py   /Volumes watcher, copy + verify + delete
-  audio.py      ffmpeg conversion, hashing, waveform peaks
-  transcribe.py mlx-whisper
-  diarize.py    pyannote / built-in diarizers
-  speakers.py   voice embeddings + people registry matching
-  pipeline.py   background worker
-  server.py     FastAPI API
-  main.py       entry point
-```
+[MIT](LICENSE). Models are downloaded from their own sources under their own licenses (Whisper and pyannote: MIT;
+WeSpeaker and Qwen: Apache-2.0; Silero VAD: MIT).

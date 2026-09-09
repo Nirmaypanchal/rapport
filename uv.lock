@@ -355,51 +355,6 @@ wheels = [
 ]
 
 [[package]]
-name = "dji-mic-app"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "fastapi" },
-    { name = "huggingface-hub" },
-    { name = "mlx-lm" },
-    { name = "mlx-whisper" },
-    { name = "numpy" },
-    { name = "pyannote-audio" },
-    { name = "python-multipart" },
-    { name = "scikit-learn" },
-    { name = "silero-vad" },
-    { name = "soundfile" },
-    { name = "torch" },
-    { name = "torchaudio" },
-    { name = "uvicorn", extra = ["standard"] },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pyinstaller" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "fastapi", specifier = ">=0.115" },
-    { name = "huggingface-hub", specifier = ">=0.24" },
-    { name = "mlx-lm", specifier = ">=0.31.3" },
-    { name = "mlx-whisper", specifier = ">=0.4" },
-    { name = "numpy", specifier = ">=1.26" },
-    { name = "pyannote-audio", specifier = ">=3.3" },
-    { name = "python-multipart", specifier = ">=0.0.32" },
-    { name = "scikit-learn", specifier = ">=1.5" },
-    { name = "silero-vad", specifier = ">=5.1" },
-    { name = "soundfile", specifier = ">=0.12" },
-    { name = "torch", specifier = ">=2.4" },
-    { name = "torchaudio", specifier = ">=2.4" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.30" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pyinstaller", specifier = ">=6.22.2" }]
-
-[[package]]
 name = "einops"
 version = "0.8.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1691,6 +1646,51 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/86/bf/899e81e4cce32febab4fb42bb97dcdf66bc135272882d1987881a4b519e9/pyyaml-6.0.3-cp312-cp312-win_amd64.whl", hash = "sha256:5fcd34e47f6e0b794d17de1b4ff496c00986e1c83f7ab2fb8fcfe9616ff7477b", size = 154003, upload-time = "2025-09-25T21:32:21.167Z" },
     { url = "https://files.pythonhosted.org/packages/1a/08/67bd04656199bbb51dbed1439b7f27601dfb576fb864099c7ef0c3e55531/pyyaml-6.0.3-cp312-cp312-win_arm64.whl", hash = "sha256:64386e5e707d03a7e172c0701abfb7e10f0fb753ee1d773128192742712a98fd", size = 140344, upload-time = "2025-09-25T21:32:22.617Z" },
 ]
+
+[[package]]
+name = "rapport"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "fastapi" },
+    { name = "huggingface-hub" },
+    { name = "mlx-lm" },
+    { name = "mlx-whisper" },
+    { name = "numpy" },
+    { name = "pyannote-audio" },
+    { name = "python-multipart" },
+    { name = "scikit-learn" },
+    { name = "silero-vad" },
+    { name = "soundfile" },
+    { name = "torch" },
+    { name = "torchaudio" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pyinstaller" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = ">=0.115" },
+    { name = "huggingface-hub", specifier = ">=0.24" },
+    { name = "mlx-lm", specifier = ">=0.31.3" },
+    { name = "mlx-whisper", specifier = ">=0.4" },
+    { name = "numpy", specifier = ">=1.26" },
+    { name = "pyannote-audio", specifier = ">=3.3" },
+    { name = "python-multipart", specifier = ">=0.0.32" },
+    { name = "scikit-learn", specifier = ">=1.5" },
+    { name = "silero-vad", specifier = ">=5.1" },
+    { name = "soundfile", specifier = ">=0.12" },
+    { name = "torch", specifier = ">=2.4" },
+    { name = "torchaudio", specifier = ">=2.4" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.30" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pyinstaller", specifier = ">=6.22.2" }]
 
 [[package]]
 name = "regex"

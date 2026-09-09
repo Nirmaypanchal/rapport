@@ -50,7 +50,7 @@ const DEVICES: Tile[] = [
   { id: "usb", name: "USB recorder or SD card", mark: { kind: "icon", icon: HardDrive }, blurb: "Zoom, Tascam, Sony, any drive with audio." },
   { id: "mic", name: "Microphone & Bluetooth", mark: si(siBluetooth), blurb: "Record from AirPods, a USB mic, or the Mac." },
   { id: "voicememos", name: "Apple Voice Memos", mark: app("voicememos", si(siApple)), blurb: "Mac, iPhone and Apple Watch memos via iCloud." },
-  { id: "omi", name: "Omi", mark: file("omi.png", { kind: "icon", icon: Circle }), blurb: "Conversations from the Omi pendant." },
+  { id: "omi", name: "Omi", mark: { kind: "icon", icon: Circle }, blurb: "Conversations from the Omi pendant." },
 ];
 const INTEGRATIONS: Tile[] = [
   { id: "granola", name: "Granola", mark: app("granola", file("granola.svg")), blurb: "Meeting notes, transcripts and summaries." },
