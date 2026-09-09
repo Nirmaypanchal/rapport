@@ -114,8 +114,20 @@ Gotcha: Tauri's resource copier dereferences symlinks, which breaks MLX's Metal 
 
 ## Testing
 
-There's a `tests/` folder waiting for you. Useful fixtures are any short WAV; the pipeline runs end to end in about 20 seconds
-on an M1 with the `base` Whisper model. CI runs type checks and a frontend build on every PR.
+```bash
+scripts/test-light.sh                  # backend tests that need no models; runs on Linux too (this is what CI's ubuntu job runs)
+uv run python -m pytest -q tests       # the same tests in the full environment (CI's macOS job)
+scripts/e2e.py                         # macOS: real pipeline on a synthetic two-voice recording, about a minute with whisper-base
+scripts/e2e.py --core desktop/sidecar/dist/rapport-core/rapport-core   # the same against a frozen sidecar
+```
+
+Tests live in `tests/` with fixtures in `tests/conftest.py` (a scratch library in a temp folder; your real library is never touched).
+Keep new tests free of ML so they run everywhere; the pipeline is covered by `scripts/e2e.py`, which the sprint runs nightly on a Mac.
+
+## The sprint
+
+Rapport is developed by a continuous, mostly autonomous product sprint. `AGENTS.md` has the rules, `sprint/` has the board and
+the logs. Branches named `sprint/*` are merged automatically when CI passes; use `draft/*` for anything that should wait for a person.
 
 ## Ideas that would be great contributions
 
