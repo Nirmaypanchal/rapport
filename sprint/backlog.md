@@ -4,11 +4,6 @@ Ordered. The Build agent takes the first unchecked item under **Now**. See [READ
 
 ## Now (ready to build)
 
-- [ ] **Summary templates** — pick Meeting notes, Interview, Lecture, Sales call, Journal or a custom prompt per recording. _Why:_ roadmap; every competitor (Granola, Otter, MacWhisper) ships templates and it is the most requested feature in this category. _Size:_ M.
-  - Story: as a user I choose what kind of recording this was and get a summary shaped for it.
-  - Acceptance: a `summary_template` per recording (default from settings); templates live in `rapport/templates/*.md` with a name, description and prompt; the Summary tab shows a template picker and "Regenerate"; custom prompt saved in settings; existing summaries untouched until regenerated; tests cover template loading and prompt assembly.
-  - UI: a small select in the Summary tab header, Cue Sheet styling; picker also in Settings under Summaries.
-  - Files: `rapport/summarize.py`, `rapport/db.py` (column + migration), `rapport/server.py`, `frontend/src/components/recordings/summary-tab.tsx`, `frontend/src/components/settings-view.tsx`, `docs/how-it-works.md`.
 - [ ] **Ask your library (local RAG-lite)** — a question box on the Search page that answers from transcript snippets using the local model, with the moments linked. _Why:_ roadmap "Later" but the landing page promises a second brain; the MCP server below needs the same retrieval. _Size:_ M.
   - Acceptance: `POST /api/ask {q}` returns `{answer, sources:[{recording_id,start,snippet}]}` built from FTS top hits plus the local model; UI shows the answer with clickable sources; works when no model is available by returning sources only; tests for retrieval assembly.
 - [ ] **MCP server** — Claude, ChatGPT, Cursor and other MCP clients can search recordings, read transcripts and summaries, and write notes back. _Why:_ roadmap and landing page promise; differentiator no competitor has locally. _Size:_ L (split: read-only first).
@@ -26,6 +21,9 @@ Ordered. The Build agent takes the first unchecked item under **Now**. See [READ
 - [ ] **Zoom / Google Meet local recordings** — watch their default folders. _Size:_ S.
 - [ ] **Obsidian and Markdown export of the whole library** — one folder of `.md` per recording. _Size:_ S.
 - [ ] **Onboarding** — first-run screen that picks sources and explains the model download. _Size:_ M.
+- [ ] **Templates the user can edit in the app** — add, rename and edit a summary template from Settings, saved in the library folder. _Why:_ the shipped templates are read from `rapport/templates/` inside the app bundle, so today "custom" is one prompt and editing a built-in means editing the source. _Size:_ M.
+- [ ] **Summary template per source** — a Granola sync is a meeting, a Voice Memo usually is not; default the template from where the recording came. _Why:_ noticed while building templates; would remove most of the picking. _Size:_ S.
+- [ ] **Make `sprint-merge` fail loudly** — drop the `|| true` after `gh pr create` (or assert a PR exists afterwards) so the workflow cannot report success having merged nothing. _Why:_ it silently swallowed "Actions is not permitted to create pull requests" twice on 2026-09-09; see `needs-human/2026-09-09-actions-cannot-open-prs.md`. _Size:_ S.
 
 ## Later (ideas)
 
@@ -39,3 +37,4 @@ Ordered. The Build agent takes the first unchecked item under **Now**. See [READ
 - [x] Native macOS app, worker process, progress bars, Voice Memos picker, speaker reset (2026-09-09)
 - [x] Open source: MIT, docs, community files, CI, release workflow (2026-09-09)
 - [x] Sprint infrastructure: manual, board, tests, e2e, auto-merge, escalation (2026-09-09)
+- [x] Summary templates: meeting, interview, lecture, sales call, journal, custom, per recording (2026-09-09, [#1](https://github.com/Nirmaypanchal/rapport/pull/1))
