@@ -3,12 +3,13 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
-import { api, fetcher, openExternal, type LogLine, type Settings } from "@/lib/api";
+import { api, fetcher, openExternal, type LogLine, type Settings, type SummaryTemplates } from "@/lib/api";
 
 type Providers = { ollama: string[]; mlx_default: string; active: { provider: string; model: string } | null };
 import { useStatus } from "@/lib/use-status";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -34,6 +35,7 @@ export function SettingsView() {
   const { data: status, mutate } = useStatus();
   const { data: log, mutate: mutateLog } = useSWR<LogLine[]>("/api/log?limit=150", fetcher, { refreshInterval: 5000 });
   const { data: prov } = useSWR<Providers>("/api/summary/providers", fetcher, { refreshInterval: 30000 });
+  const { data: tpl, mutate: mutateTemplates } = useSWR<SummaryTemplates>("/api/summary/templates", fetcher);
   const [s, setS] = useState<Settings | null>(null);
   useEffect(() => { if (status && !s) setS(status.settings); }, [status, s]);
   if (!status || !s) return <div className="p-10 text-center text-[13px] text-ink-3">Loading…</div>;
@@ -47,7 +49,7 @@ export function SettingsView() {
     if (patch.hf_token === "•••") delete patch.hf_token;
     if (patch.language === "") patch.language = null;
     await api("/api/settings", { method: "PUT", json: { patch } });
-    toast("Settings saved"); mutate();
+    toast("Settings saved"); mutate(); mutateTemplates();
   };
 
   return (
@@ -100,6 +102,14 @@ export function SettingsView() {
               <Input value={s.summary_model ?? ""} onChange={(e) => set("summary_model", e.target.value)} placeholder="mlx-community/… or an Ollama model name" className="h-8 max-w-[360px] bg-surface" />
             )}
           </Row>
+          <Row label="Summary template" help={tpl?.templates.find((t) => t.id === s.summary_template)?.description || "The shape new summaries take. Each recording can use a different one from its Summary tab."}>
+            <Select value={s.summary_template} onValueChange={(v) => v && set("summary_template", v)}><SelectTrigger className="max-w-[360px] bg-surface"><SelectValue /></SelectTrigger><SelectContent>{tpl?.templates.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent></Select>
+          </Row>
+          {s.summary_template === "custom" && (
+            <Row label="Custom prompt" help="Added after the rules that always hold (stay faithful, use the speaker names, write in the language of the transcript). Ask for the sections you want.">
+              <Textarea value={s.summary_custom_prompt ?? ""} onChange={(e) => set("summary_custom_prompt", e.target.value)} placeholder={"Output Markdown with exactly these sections:\n## Summary\n…"} className="min-h-[120px] max-w-[520px] bg-surface text-[13px]" />
+            </Row>
+          )}
           <Row label="Summarize automatically" help="Write a summary as soon as a recording is processed."><Switch checked={!!s.auto_summarize} onCheckedChange={(v) => set("auto_summarize", v)} /></Row>
           <Row label="Skip silences: minimum pause (s)" help="Pauses shorter than this are kept.">{num("skip_silence_min_gap")}</Row>
           <Row label="Skip silences: padding (s)" help="Audio kept on each side of a skipped pause.">{num("skip_silence_pad")}</Row>

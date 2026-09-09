@@ -88,8 +88,27 @@ Devices that mount as drives or save to folders need no code at all.
 
 ## Adding a summary provider or template
 
-`rapport/summarize.py` holds the prompt (`SYSTEM`) and two providers. A new provider is a function
-`(model, system, user) -> str`. Templates are a planned feature; today the prompt is fixed and easy to edit.
+`rapport/summarize.py` holds the shared rules (`PREAMBLE`) and two providers. A new provider is a function
+`(model, system, user) -> str`.
+
+A template is one Markdown file in `rapport/templates/`. The file name is its id; the front matter names it and the body
+is appended to `PREAMBLE` to make the system prompt:
+
+```markdown
+---
+name: Stand-up
+description: Yesterday, today, blockers.
+order: 60
+---
+Output Markdown with exactly these sections:
+## Yesterday
+…
+```
+
+Drop the file in and it appears in the Summary tab and in Settings; nothing else to register. A recording remembers the
+template it was summarized with in `recordings.summary_template`, and users can write their own prompt instead
+(the `custom` template, stored in settings). The files are read from disk at runtime; the PyInstaller spec copies the
+whole folder into the frozen sidecar, so a new template needs no packaging change.
 
 ## Swapping models
 

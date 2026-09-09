@@ -4,6 +4,10 @@
 * ``mlx``    - otherwise mlx-lm with a small instruct model downloaded once from Hugging Face.
 
 Nothing is sent anywhere else.
+
+What the summary looks like comes from a *template*: a Markdown file in ``rapport/templates`` whose front matter
+names it and whose body tells the model which sections to write. Every template is prefixed with ``PREAMBLE``,
+the rules that hold whatever the recording is. Users can also write their own prompt (the ``custom`` template).
 """
 from __future__ import annotations
 
@@ -11,19 +15,96 @@ import json
 import threading
 import urllib.error
 import urllib.request
+from dataclasses import dataclass
+from pathlib import Path
 
 OLLAMA = "http://127.0.0.1:11434"
 MLX_DEFAULT = "mlx-community/Qwen2.5-3B-Instruct-4bit"
 
-SYSTEM = (
+TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
+DEFAULT_TEMPLATE = "meeting"
+CUSTOM_TEMPLATE = "custom"
+
+PREAMBLE = (
     "You summarize transcripts of audio recordings made with a personal microphone. "
     "Write in the language of the transcript. Be concrete and faithful: never invent facts, names or numbers. "
-    "Use the speaker names given; refer to people by name and avoid gendered pronouns unless the transcript makes them explicit. Output Markdown with exactly these sections:\n"
-    "## Summary\nOne short paragraph (2-4 sentences) saying what this recording is and what happened.\n"
-    "## Key points\n3-8 bullets with the substance, each one line.\n"
-    "## Action items\nBullets of anything someone said they would do or asked for, with who; write 'None' if there are none.\n"
-    "## Notable quotes\nUp to 3 short verbatim quotes with the speaker; omit the section if nothing stands out."
+    "Use the speaker names given; refer to people by name and avoid gendered pronouns unless the transcript makes them explicit."
 )
+
+
+@dataclass(frozen=True)
+class Template:
+    id: str
+    name: str
+    description: str
+    prompt: str
+    order: int = 100
+    builtin: bool = True
+
+    def to_json(self) -> dict:
+        return {"id": self.id, "name": self.name, "description": self.description, "builtin": self.builtin}
+
+
+def _parse_template(tid: str, text: str) -> Template:
+    """`---` front matter with `name`, `description` and `order`, then the prompt body."""
+    meta: dict[str, str] = {}
+    body = text
+    if text.startswith("---"):
+        lines = text.splitlines()
+        end = next((i for i in range(1, len(lines)) if lines[i].strip() == "---"), None)
+        if end is not None:
+            for line in lines[1:end]:
+                key, sep, value = line.partition(":")
+                if sep:
+                    meta[key.strip().lower()] = value.strip()
+            body = "\n".join(lines[end + 1:])
+    try:
+        order = int(meta.get("order", "100"))
+    except ValueError:
+        order = 100
+    return Template(id=tid, name=meta.get("name") or tid, description=meta.get("description", ""), prompt=body.strip(), order=order)
+
+
+_templates_cache: list[Template] | None = None
+
+
+def builtin_templates() -> list[Template]:
+    """Every template shipped with the app, in display order. Read once, then cached."""
+    global _templates_cache
+    if _templates_cache is None:
+        found = []
+        for p in sorted(TEMPLATE_DIR.glob("*.md")):
+            try:
+                found.append(_parse_template(p.stem, p.read_text(encoding="utf-8")))
+            except OSError:
+                continue
+        _templates_cache = sorted(found, key=lambda t: (t.order, t.name))
+    return list(_templates_cache)
+
+
+def templates(custom_prompt: str = "") -> list[Template]:
+    """The built-in templates plus the user's own prompt, which is always offered."""
+    custom = Template(
+        id=CUSTOM_TEMPLATE, name="Custom prompt",
+        description="Your own instructions, written in Settings." if custom_prompt.strip() else "Write your own instructions in Settings.",
+        prompt=custom_prompt.strip(), order=1000, builtin=False,
+    )
+    return builtin_templates() + [custom]
+
+
+def get_template(tid: str | None, custom_prompt: str = "") -> Template:
+    """The template with this id, falling back to the default. A `custom` with no prompt falls back too."""
+    by_id = {t.id: t for t in templates(custom_prompt)}
+    t = by_id.get(tid or "")
+    if t is None or (t.id == CUSTOM_TEMPLATE and not t.prompt):
+        t = by_id.get(DEFAULT_TEMPLATE) or next(iter(by_id.values()))
+    return t
+
+
+def build_system(template: Template) -> str:
+    """The system prompt sent to the model: the rules that always hold, then the template's own instructions."""
+    return f"{PREAMBLE} {template.prompt}" if template.prompt else PREAMBLE
+
 
 _mlx_lock = threading.Lock()
 _mlx_cache: dict[str, tuple] = {}
@@ -63,12 +144,16 @@ def _transcript_text(segments: list[dict], names: dict[str, str], max_chars: int
     return text
 
 
-def summarize(segments: list[dict], names: dict[str, str], provider: str, model: str, title: str | None = None) -> str:
+def summarize(
+    segments: list[dict], names: dict[str, str], provider: str, model: str,
+    title: str | None = None, template: Template | None = None,
+) -> str:
+    system = build_system(template or get_template(DEFAULT_TEMPLATE))
     transcript = _transcript_text(segments, names)
     user = f"Recording: {title or 'untitled'}\nSpeakers: {', '.join(sorted(set(names.values()))) or 'unknown'}\n\nTranscript:\n{transcript}"
     if provider == "ollama":
-        return _ollama_chat(model, SYSTEM, user)
-    return _mlx_chat(model, SYSTEM, user)
+        return _ollama_chat(model, system, user)
+    return _mlx_chat(model, system, user)
 
 
 def _ollama_chat(model: str, system: str, user: str) -> str:

@@ -32,6 +32,9 @@ hiddenimports += ["uvicorn.logging", "uvicorn.loops", "uvicorn.loops.auto", "uvi
 # Static ffmpeg/ffprobe travel in bin/ next to the executable.
 binaries += [(str(BIN / "ffmpeg"), "bin"), (str(BIN / "ffprobe"), "bin")]
 
+# Summary templates are read from disk at runtime, so the Markdown files have to travel with the bundle.
+datas += [(str(ROOT / "rapport" / "templates"), "rapport/templates")]
+
 a = Analysis(
     [str(ROOT / "desktop" / "sidecar" / "entry.py")],
     pathex=[str(ROOT)],

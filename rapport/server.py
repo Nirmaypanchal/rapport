@@ -65,6 +65,10 @@ class ExportBody(BaseModel):
     kind: str
 
 
+class SummarizeBody(BaseModel):
+    template: str | None = None   # a template id; None keeps whatever the recording already uses
+
+
 class PeopleReset(BaseModel):
     mode: str = "rematch"
 
@@ -432,12 +436,19 @@ def create_app(library: Library, db: Database, importer: Importer, worker, recor
         return db.get_recording(rid)
 
     @app.post("/api/recordings/{rid}/summarize")
-    def summarize_recording(rid: int):
+    def summarize_recording(rid: int, body: SummarizeBody | None = None):
+        from .summarize import templates as summary_templates
+
         r = db.get_recording(rid)
         if not r:
             raise HTTPException(404)
         if r["status"] != "done":
             raise HTTPException(409, "recording is not processed yet")
+        wanted = body.template if body else None
+        if wanted is not None:
+            if wanted not in {t.id for t in summary_templates(library.settings.summary_custom_prompt)}:
+                raise HTTPException(400, f"unknown summary template {wanted!r}")
+            db.update_recording(rid, summary_template=wanted)
         if not worker.summarize_later(rid):
             raise HTTPException(503, "No local model available. Start Ollama, or choose the MLX model in Settings.")
         return {"ok": True}
@@ -449,6 +460,17 @@ def create_app(library: Library, db: Database, importer: Importer, worker, recor
         s = library.settings
         active = resolve_provider(s.summary_provider, s.summary_model or None)
         return {"ollama": ollama_models(), "mlx_default": MLX_DEFAULT, "active": {"provider": active[0], "model": active[1]} if active else None}
+
+    @app.get("/api/summary/templates")
+    def summary_templates_route():
+        """The shapes a summary can take: the built-in ones plus the user's own prompt."""
+        from .summarize import get_template, templates as summary_templates
+
+        s = library.settings
+        return {
+            "templates": [t.to_json() for t in summary_templates(s.summary_custom_prompt)],
+            "default": get_template(s.summary_template, s.summary_custom_prompt).id,
+        }
 
     @app.post("/api/recordings/{rid}/reprocess")
     def reprocess(rid: int):
