@@ -19,6 +19,17 @@ jobs:
         run: |
           cd desktop/app/src-tauri/target/release/bundle/macos
           hdiutil create -volname Rapport -srcfolder Rapport.app -ov -format UDZO Rapport.dmg
+      - uses: actions/upload-artifact@v4
+        with: { name: Rapport.dmg, path: desktop/app/src-tauri/target/release/bundle/macos/Rapport.dmg }
+      - name: Release notes from CHANGELOG
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          awk -v v="$v" '/^## \[/{p = index($0, "[" v "]") > 0} p' CHANGELOG.md | tail -n +2 > /tmp/notes.md
+          [ -s /tmp/notes.md ] || echo "See CHANGELOG.md." > /tmp/notes.md
+          printf '\n\nmacOS 14+, Apple silicon. Unsigned: right-click the app and choose Open the first time.\n' >> /tmp/notes.md
       - uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
-        with: { files: desktop/app/src-tauri/target/release/bundle/macos/Rapport.dmg }
+        with:
+          files: desktop/app/src-tauri/target/release/bundle/macos/Rapport.dmg
+          body_path: /tmp/notes.md

@@ -1,0 +1,46 @@
+name: Sprint merge
+# Branches named sprint/* are the autonomous agents' work. When CI passes on such a branch this opens a pull request
+# (if none exists) and squash-merges it. When CI fails it still opens the PR so the failure is visible.
+# draft/* branches are never merged automatically. See AGENTS.md.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  merge:
+    if: startsWith(github.event.workflow_run.head_branch, 'sprint/') && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BRANCH: ${{ github.event.workflow_run.head_branch }}
+      SHA: ${{ github.event.workflow_run.head_sha }}
+      RESULT: ${{ github.event.workflow_run.conclusion }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Open the pull request if needed
+        run: |
+          set -e
+          n=$(gh pr list --head "$BRANCH" --state open --json number --jq 'length')
+          if [ "$n" = "0" ]; then
+            title=$(git log -1 --format=%s "$SHA")
+            body=$(git log -1 --format=%b "$SHA")
+            printf '%s\n\n---\nOpened automatically from `%s` by the sprint (see AGENTS.md). CI on the branch: **%s**.\n' "$body" "$BRANCH" "$RESULT" > /tmp/body.md
+            gh pr create --head "$BRANCH" --base main --title "$title" --body-file /tmp/body.md --label sprint || true
+          fi
+      - name: Merge when green
+        if: env.RESULT == 'success'
+        run: |
+          set -e
+          num=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')
+          [ -n "$num" ] || exit 0
+          if gh pr view "$num" --json labels --jq '.labels[].name' | grep -qx 'needs-human'; then echo "held: needs-human"; exit 0; fi
+          gh pr merge "$num" --squash --delete-branch --body "Merged automatically: CI passed on $SHA."
+      - name: Note the failure
+        if: env.RESULT != 'success'
+        run: |
+          num=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')
+          [ -n "$num" ] && gh pr comment "$num" --body "CI **$RESULT** on $SHA. Not merged. The next Build run should fix this or close the PR." || true

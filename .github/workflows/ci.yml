@@ -1,6 +1,6 @@
 name: CI
 on:
-  push: { branches: [main] }
+  push: { branches: [main, 'sprint/**', 'draft/**'] }
   pull_request:
 jobs:
   frontend:
@@ -10,6 +10,12 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm, cache-dependency-path: frontend/package-lock.json }
       - run: cd frontend && npm ci && npx tsc --noEmit && npm run build
+  backend-light:
+    runs-on: ubuntu-latest  # what the cloud agents can run: no ML, no Apple silicon
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: scripts/test-light.sh
   backend:
     runs-on: macos-14  # Apple silicon: mlx and the models are macOS-only
     steps:
@@ -18,4 +24,4 @@ jobs:
       - run: brew install ffmpeg
       - run: uv sync
       - run: uv run python -c "import rapport.main, rapport.sidecar, rapport.workerproc, rapport.connectors; print('ok')"
-      - run: uv run python -m pytest -q tests || echo "no tests yet"
+      - run: uv run python -m pytest -q tests

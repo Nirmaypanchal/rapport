@@ -1,0 +1,35 @@
+name: Needs human
+# Every file in sprint/needs-human/*.md is a request for the owner. This opens one issue per file (once),
+# labeled needs-human and assigned to the owner, so GitHub emails them. See AGENTS.md.
+on:
+  push:
+    branches: [main]
+    paths: ["sprint/needs-human/*.md"]
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  escalate:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      OWNER_LOGIN: Nirmaypanchal
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          set -e
+          shopt -s nullglob
+          for f in sprint/needs-human/*.md; do
+            [ "$(basename "$f")" = "README.md" ] && continue
+            title=$(head -1 "$f" | sed -E 's/^#+ *//')
+            [ -n "$title" ] || continue
+            if gh issue list --label needs-human --state all --search "\"$title\" in:title" --json title --jq '.[].title' | grep -Fxq "$title"; then
+              continue
+            fi
+            { tail -n +2 "$f"; printf '\n\n---\nFrom `%s`. When done, close this issue; the sprint moves the file to `done/`.\n' "$f"; } > /tmp/body.md
+            gh issue create --title "$title" --body-file /tmp/body.md --label needs-human --assignee "$OWNER_LOGIN"
+            echo "opened: $title"
+          done

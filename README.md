@@ -84,7 +84,11 @@ or add a connector: [docs/developers.md](docs/developers.md).
 
 Your conversations are the most personal data you have. The only way to trust a tool with them is to be able to
 read it, run it yourself, and keep it working forever. Rapport is MIT licensed; use it, fork it, build on it.
-If you make something with it, tell us in [Discussions](https://github.com/Nirmaypanchal/rapport/discussions).
+If you make something with it, tell us in [Discussions](https://github.com/Nirmaypanchal/rapport/discussions)
+or on [r/rapport](https://www.reddit.com/r/rapport/).
+
+Rapport is developed in the open by a continuous, mostly autonomous product sprint: research, planning, building,
+testing and releasing are logged in [sprint/](sprint/). Read [AGENTS.md](AGENTS.md) to see the rules it follows.
 
 ## Contributing
 
