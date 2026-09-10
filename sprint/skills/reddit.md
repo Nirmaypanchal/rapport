@@ -1,5 +1,10 @@
-# Reddit (Last verified: 2026-09-09, before credentials existed)
+# Reddit (Last verified: 2026-09-10, second Community run)
 
+- **Still blocked as of 2026-09-10.** Re-ran the same `curl -A "rapport-sprint/1.0 …" .../new.json` request; still
+  `CONNECT tunnel failed, response 403`, and `$HTTPS_PROXY/__agentproxy/status` still logs `connect_rejected` for
+  `www.reddit.com:443`. No change since the escalation below was filed. Don't re-test this every run — check
+  `sprint/needs-human/2026-09-09-cloud-environment-blocks-reddit.md` is still open (not moved to `done/`) instead;
+  only retry the curl once that file is gone.
 - **This cloud environment cannot reach reddit.com at all (2026-09-09, first Community run).** Every request to
   `www.reddit.com`, `old.reddit.com` and `api.reddit.com` — via `curl` and via `WebFetch` — fails before it reaches
   Reddit: `curl` reports `CONNECT tunnel failed, response 403` and `$HTTPS_PROXY/__agentproxy/status` shows
