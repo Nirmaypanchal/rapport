@@ -16,6 +16,8 @@ Nothing is uploaded. No account. No subscription. MIT licensed.
 - **Knows who's talking, across recordings.** Every voice gets a fingerprint. Name a person once and every future
   recording with that voice carries the name. Fix mistakes in place: rename, reassign, split or merge turns.
 - **Search everything you ever said or heard.** Full-text search across all transcripts opens the recording at that second.
+- **Ask your library a question.** "What did we decide about pricing?" is answered from your own transcripts by your own
+  local model, with every claim linked to the moment it came from.
 - **Summaries with your own model.** Ollama if it's running, otherwise a small MLX model downloaded once. No API keys.
 - **Plain files you can see.** Originals, transcripts, people and settings live in one folder you can back up or delete.
 
@@ -78,7 +80,7 @@ or add a connector: [docs/developers.md](docs/developers.md).
 - [Privacy](docs/privacy.md): exactly what touches the network, and what doesn't
 - [FAQ](docs/faq.md) and [Troubleshooting](docs/troubleshooting.md)
 - [For developers](docs/developers.md): architecture, API, adding sources and summarizers, desktop build
-- [Roadmap](docs/roadmap.md): people memory, MCP server, ask-your-library
+- [Roadmap](docs/roadmap.md): people memory, MCP server, signed releases
 
 ## Why open source
 

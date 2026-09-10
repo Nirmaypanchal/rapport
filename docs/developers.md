@@ -16,7 +16,8 @@ rapport/                 Python backend
   transcribe.py          Whisper on MLX (progress via its tqdm hook)
   diarize.py             built-in diarizer (Silero + WeSpeaker + clustering) and pyannote wrapper
   speakers.py            voice embeddings, people matching, reset/re-match
-  summarize.py           Ollama / MLX summaries and the prompt
+  summarize.py           Ollama / MLX summaries, the templates and the one-turn `chat()` both features use
+  ask.py                 Ask your library: FTS retrieval, excerpt assembly, the prompt, citation parsing
   connectors.py          Granola, Omi, Notion (read-only)
   recorder.py            live recording via ffmpeg avfoundation
   voicememos.py          Apple Voice Memos database and files
@@ -57,6 +58,7 @@ All routes are under `/api`, JSON, on 127.0.0.1. In the desktop app every call n
 | GET | `/api/recordings/{id}/audio` · `/original` · `/transcript.txt` · `/condensed` · `/speech` | media and derived data |
 | GET/POST | `/api/people`, `/api/people/{id}`, `/merge/{other}`, `/api/people/reset` | people |
 | GET | `/api/search?q=` | full-text search with snippets |
+| POST | `/api/ask` | `{q}` → `{answer, sources, model, reason}`: retrieval plus the local model |
 | GET/POST | `/api/sources`, `/api/sources/{name}/sync`, `/api/voicememos`, `/api/voicememos/import` | sources |
 | POST | `/api/import/upload` (multipart) · `/api/import/path` | bring files in |
 | POST | `/api/record/start` · `/api/record/stop` | live recording |
@@ -89,7 +91,8 @@ Devices that mount as drives or save to folders need no code at all.
 ## Adding a summary provider or template
 
 `rapport/summarize.py` holds the shared rules (`PREAMBLE`) and two providers. A new provider is a function
-`(model, system, user) -> str`.
+`(model, system, user) -> str` dispatched from `chat()`. Summaries and Ask both go through `chat()`, so one
+provider serves both.
 
 A template is one Markdown file in `rapport/templates/`. The file name is its id; the front matter names it and the body
 is appended to `PREAMBLE` to make the system prompt:

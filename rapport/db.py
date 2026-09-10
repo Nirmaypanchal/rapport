@@ -419,13 +419,36 @@ class Database:
         ).fetchall()
         return [dict(r) for r in rows]
 
+    def segment_context(self, sid: int, before: int = 1, after: int = 1) -> list[dict]:
+        """A segment together with its neighbouring turns in the same recording, in order.
+
+        What a search hit means usually needs the turn before and after it; this is how "Ask" builds a passage.
+        """
+        c = self.connect()
+        row = c.execute("SELECT recording_id, idx FROM segments WHERE id=?", (sid,)).fetchone()
+        if not row:
+            return []
+        rows = c.execute(
+            """SELECT s.id, s.idx, s.recording_id, s.speaker_label, s.start, s.end, s.text,
+                      COALESCE(p.name, rs.display_name) AS person_name
+               FROM segments s
+               LEFT JOIN recording_speakers rs ON rs.recording_id = s.recording_id AND rs.label = s.speaker_label
+               LEFT JOIN people p ON p.id = rs.person_id
+               WHERE s.recording_id=? AND s.idx BETWEEN ? AND ? ORDER BY s.idx""",
+            (row["recording_id"], row["idx"] - max(0, before), row["idx"] + max(0, after)),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
     # ---- search ----------------------------------------------------------
-    def search(self, query: str, limit: int = 100) -> list[dict]:
+    def search(self, query: str, limit: int = 100, match: str = "all") -> list[dict]:
+        """Full-text search over every turn. `match='all'` needs every term (the Search page);
+        `match='any'` ranks whatever matches most of them (a question, where no one word is required)."""
         q = query.strip()
         if not q:
             return []
         # Quote each term so punctuation in user input doesn't break the FTS grammar.
-        terms = " ".join('"' + t.replace('"', '""') + '"' for t in q.split())
+        joiner = " OR " if match == "any" else " "
+        terms = joiner.join('"' + t.replace('"', '""') + '"' for t in q.split())
         rows = self.connect().execute(
             """SELECT s.id, s.recording_id, s.speaker_label, s.start, s.end,
                       snippet(segments_fts, 0, '[[', ']]', '…', 14) AS snippet,

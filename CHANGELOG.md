@@ -4,6 +4,13 @@ All notable changes to Rapport. The format follows Keep a Changelog; versions fo
 
 ## [Unreleased]
 
+### Added
+
+- **Ask your library.** A second tab on the Search page answers a question from your own transcripts: full-text
+  retrieval picks the moments, the local model writes a few sentences and cites each one, and every citation jumps to
+  the excerpt and opens the recording where the words were said. With no local model installed you still get the
+  moments that match. `POST /api/ask`.
+
 ## [0.1.0] - 2026-09-09
 
 First public version.

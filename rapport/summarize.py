@@ -151,12 +151,17 @@ def summarize(
     system = build_system(template or get_template(DEFAULT_TEMPLATE))
     transcript = _transcript_text(segments, names)
     user = f"Recording: {title or 'untitled'}\nSpeakers: {', '.join(sorted(set(names.values()))) or 'unknown'}\n\nTranscript:\n{transcript}"
+    return chat(provider, model, system, user)
+
+
+def chat(provider: str, model: str, system: str, user: str, max_tokens: int = 900, timeout: float = 600) -> str:
+    """One turn with the local model. `provider` and `model` come from `resolve_provider`."""
     if provider == "ollama":
-        return _ollama_chat(model, system, user)
-    return _mlx_chat(model, system, user)
+        return _ollama_chat(model, system, user, timeout=timeout)
+    return _mlx_chat(model, system, user, max_tokens=max_tokens)
 
 
-def _ollama_chat(model: str, system: str, user: str) -> str:
+def _ollama_chat(model: str, system: str, user: str, timeout: float = 600) -> str:
     body = json.dumps({
         "model": model, "stream": False,
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
@@ -164,14 +169,14 @@ def _ollama_chat(model: str, system: str, user: str) -> str:
     }).encode()
     req = urllib.request.Request(f"{OLLAMA}/api/chat", data=body, headers={"Content-Type": "application/json"})
     try:
-        with urllib.request.urlopen(req, timeout=600) as r:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
             data = json.load(r)
     except urllib.error.HTTPError as e:
         raise RuntimeError(f"Ollama error {e.code}: {e.read().decode(errors='ignore')[:200]}") from e
     return (data.get("message") or {}).get("content", "").strip()
 
 
-def _mlx_chat(model: str, system: str, user: str) -> str:
+def _mlx_chat(model: str, system: str, user: str, max_tokens: int = 900) -> str:
     from mlx_lm import generate, load
 
     with _mlx_lock:
@@ -181,4 +186,4 @@ def _mlx_chat(model: str, system: str, user: str) -> str:
         m, tok = _mlx_cache[model]
         messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
         prompt = tok.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
-        return generate(m, tok, prompt=prompt, max_tokens=900, verbose=False).strip()
+        return generate(m, tok, prompt=prompt, max_tokens=max_tokens, verbose=False).strip()

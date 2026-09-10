@@ -69,6 +69,10 @@ class SummarizeBody(BaseModel):
     template: str | None = None   # a template id; None keeps whatever the recording already uses
 
 
+class AskBody(BaseModel):
+    q: str
+
+
 class PeopleReset(BaseModel):
     mode: str = "rematch"
 
@@ -747,6 +751,20 @@ def create_app(library: Library, db: Database, importer: Importer, worker, recor
             return db.search(q)
         except Exception as e:
             return JSONResponse({"error": str(e)}, status_code=400)
+
+    @app.post("/api/ask")
+    def ask_library(body: AskBody):
+        """Answer a question from the transcripts themselves: local full-text search, then the local model.
+
+        The excerpts come back either way, so the answer is still useful with no model installed.
+        """
+        from .ask import ask
+
+        s = library.settings
+        try:
+            return ask(db, body.q, s.summary_provider, s.summary_model or None)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
 
     # ---- UI ----------------------------------------------------------------
     @app.middleware("http")

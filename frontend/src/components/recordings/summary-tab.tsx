@@ -7,31 +7,10 @@ import { Sparkles } from "lucide-react";
 import { api, fetcher, type Recording, type SummaryTemplates } from "@/lib/api";
 import { fmtClock, fmtDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
+import { Markdown } from "@/components/markdown";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Providers = { ollama: string[]; mlx_default: string; active: { provider: string; model: string } | null };
-
-/** Renders the small Markdown subset the summarizer is asked for: ## headings, bullets, paragraphs, **bold**. */
-function Markdown({ text }: { text: string }) {
-  const blocks: React.ReactNode[] = [];
-  let list: string[] = [];
-  const flush = () => { if (list.length) { blocks.push(<ul key={`l${blocks.length}`} className="my-2 list-disc space-y-1 pl-5">{list.map((l, i) => <li key={i}><Inline text={l} /></li>)}</ul>); list = []; } };
-  for (const raw of text.split(/\r?\n/)) {
-    const line = raw.trim();
-    if (!line) { flush(); continue; }
-    if (/^#{1,3}\s/.test(line)) { flush(); blocks.push(<div key={`h${blocks.length}`} className="eyebrow mt-5 mb-1.5 first:mt-0">{line.replace(/^#+\s/, "")}</div>); continue; }
-    if (/^[-*•]\s/.test(line)) { list.push(line.replace(/^[-*•]\s/, "")); continue; }
-    if (/^\d+[.)]\s/.test(line)) { list.push(line.replace(/^\d+[.)]\s/, "")); continue; }
-    flush(); blocks.push(<p key={`p${blocks.length}`} className="my-1.5">{<Inline text={line} />}</p>);
-  }
-  flush();
-  return <div className="text-[15px] leading-[1.6]">{blocks}</div>;
-}
-
-function Inline({ text }: { text: string }) {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
-  return <>{parts.map((p, i) => (p.startsWith("**") && p.endsWith("**") ? <b key={i}>{p.slice(2, -2)}</b> : <span key={i}>{p}</span>))}</>;
-}
 
 export function SummaryTab({ r, onChange }: { r: Recording; onChange: () => void }) {
   const { data: providers } = useSWR<Providers>("/api/summary/providers", fetcher, { refreshInterval: 30000 });
