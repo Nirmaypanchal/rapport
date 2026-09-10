@@ -61,6 +61,21 @@ def test_search_and_recordings(library, db):
     assert r.status_code == 200 and db.get_recording(rid)["title"] == "Design review"
 
 
+def test_ask_returns_sources_without_a_model(library, db):
+    """summary_provider is "off" in the test library, so this is the no-model path: excerpts, no answer."""
+    rid = db.insert_recording(sha256="4" * 64, original_name="a.wav", rel_path="audio/a.wav", status="done", title="Kickoff")
+    db.replace_segments(rid, [{"speaker": "SPEAKER_00", "start": 12, "end": 15, "text": "the deadline is in March"}])
+    c = _client(library, db)
+
+    body = c.post("/api/ask", json={"q": "When is the deadline?"}).json()
+    assert body["answer"] is None and body["reason"] == "no_model"
+    assert body["sources"][0]["recording_id"] == rid and body["sources"][0]["start"] == 12
+    assert "deadline" in body["sources"][0]["snippet"]
+
+    assert c.post("/api/ask", json={"q": "  "}).status_code == 400
+    assert c.post("/api/ask", json={"q": "nothing like this word exists"}).json()["reason"] == "no_matches"
+
+
 def test_summary_templates_listed(library, db):
     c = _client(library, db)
     body = c.get("/api/summary/templates").json()

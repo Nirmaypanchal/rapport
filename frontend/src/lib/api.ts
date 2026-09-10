@@ -171,6 +171,32 @@ export type SearchHit = {
   person_color: string | null;
 };
 
+/** One moment behind an answer: the turn that matched, with the turns around it. `n` is the number the answer cites. */
+export type AskSource = {
+  n: number;
+  recording_id: number;
+  segment_id: number;
+  start: number;
+  end: number;
+  speaker: string;
+  person_color: string | null;
+  text: string;
+  snippet: string;
+  title: string;
+  recorded_at: string | null;
+  cited: boolean;
+};
+
+/** `answer` is null when there is nothing to write from, or no model to write it; `reason` says which. */
+export type AskAnswer = {
+  question: string;
+  answer: string | null;
+  sources: AskSource[];
+  model: { provider: string; model: string } | null;
+  reason: "no_matches" | "no_model" | "model_error" | "empty_answer" | null;
+  error: string | null;
+};
+
 export type LogLine = { id: number; ts: string; level: "info" | "warn" | "error"; message: string };
 
 /** A shape a summary can take. `builtin` ones ship with the app; the other is the user's own prompt. */

@@ -70,6 +70,28 @@ from Granola or Omi keep the summary those apps wrote.
 The transport shows a waveform, a speaker lane, and a playhead synced to the transcript. Skip silences removes pauses on the fly.
 Search is SQLite full-text search across every transcript; a hit opens the recording at that second.
 
+### 7. Ask your library
+
+Search finds the words you type. **Ask** (the second tab on the Search page) answers a question in your own words, from
+your own recordings:
+
+1. The question is reduced to its meaningful words and put to the same full-text index, this time needing only *some*
+   of them to match — a question is not a phrase you once said.
+2. The best hits become **excerpts**: the turn that matched plus the turn on each side, so the moment reads as a moment.
+   At most two come from any one recording, so a long meeting cannot crowd out the rest, and at most eight in all.
+3. Those excerpts — and nothing else — are given to the local model with the question, and it is asked to answer in a
+   few sentences and to cite each one as `[1]`, `[2]`.
+
+Every citation is a button: it jumps to the excerpt, and the excerpt opens the recording a second before the words were
+said, so you can hear it for yourself. Excerpts the answer did not use are still listed, dimmed.
+
+**With no local model** you still get the excerpts, listed as "moments that match" — the retrieval is the useful half,
+and nothing is invented to paper over a missing model. If the model fails or returns nothing, the excerpts remain too.
+
+Nothing leaves the Mac: the index is your SQLite file, and the model is Ollama or MLX on your own hardware. The answer
+is written by a small local model reading only what it was handed, so treat it as a fast way to find the moment rather
+than as a source of truth — the moment itself is the source, one click away.
+
 ## Architecture
 
 ```
