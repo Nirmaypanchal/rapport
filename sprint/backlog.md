@@ -4,10 +4,9 @@ Ordered. The Build agent takes the first unchecked item under **Now**. See [READ
 
 ## Now (ready to build)
 
-- [ ] **Ask your library (local RAG-lite)** — a question box on the Search page that answers from transcript snippets using the local model, with the moments linked. _Why:_ roadmap "Later" but the landing page promises a second brain; the MCP server below needs the same retrieval. _Size:_ M.
-  - Acceptance: `POST /api/ask {q}` returns `{answer, sources:[{recording_id,start,snippet}]}` built from FTS top hits plus the local model; UI shows the answer with clickable sources; works when no model is available by returning sources only; tests for retrieval assembly.
 - [ ] **MCP server** — Claude, ChatGPT, Cursor and other MCP clients can search recordings, read transcripts and summaries, and write notes back. _Why:_ roadmap and landing page promise; differentiator no competitor has locally. _Size:_ L (split: read-only first).
   - Slice 1 acceptance: `rapport/mcp.py` exposing tools `search`, `get_recording`, `get_transcript`, `get_summary`, `list_people` over stdio; `uv run python -m rapport.mcp` works against the library folder; documented in `docs/integrations.md` with a Claude Desktop config snippet; tests with a fake library.
+  - Note from Build (2026-09-10): `rapport/ask.py` now holds the retrieval half — `keywords`, `db.search(match="any")`, `pick_hits`, `passages`. An `ask` tool is one more line on top of it; do not write a second retriever.
 - [ ] **Signed, notarized releases** — DMG that opens without right-click. _Why:_ the biggest install-time drop-off for any unsigned Mac app. _Size:_ M, blocked on the owner's Apple Developer credentials (see `needs-human/`).
   - Acceptance: `release.yml` signs with `APPLE_CERTIFICATE`/`APPLE_CERTIFICATE_PASSWORD`/`APPLE_ID`/`APPLE_TEAM_ID`/`APPLE_APP_PASSWORD` secrets when present and skips cleanly when absent; `docs/getting-started.md` updated.
 
@@ -23,6 +22,9 @@ Ordered. The Build agent takes the first unchecked item under **Now**. See [READ
 - [ ] **Onboarding** — first-run screen that picks sources and explains the model download. _Size:_ M.
 - [ ] **Templates the user can edit in the app** — add, rename and edit a summary template from Settings, saved in the library folder. _Why:_ the shipped templates are read from `rapport/templates/` inside the app bundle, so today "custom" is one prompt and editing a built-in means editing the source. _Size:_ M.
 - [ ] **Summary template per source** — a Granola sync is a meeting, a Voice Memo usually is not; default the template from where the recording came. _Why:_ noticed while building templates; would remove most of the picking. _Size:_ S.
+- [ ] **Ask: index the summaries too** — a question about what a meeting decided is often best answered by the summary that already says so, but only `segments` are in the FTS index, so Ask never sees one. _Why:_ found while building Ask; the retrieval is otherwise good and this is the obvious next gain. _Size:_ S.
+- [ ] **Interactive model calls should run in the worker process** — Ask generates in the API process, so an MLX user loads the 2 GB model twice (once there, once in the worker). Ollama users pay nothing, since it is a separate app either way. Needs a request/response channel to the worker; today it only polls the database. _Why:_ found while building Ask. _Size:_ M.
+- [ ] **Stream the answer while Ask is thinking** — a large Ollama model takes tens of seconds and the UI shows only a blinking dot. Both providers can stream. _Why:_ found while building Ask. _Size:_ S.
 - [ ] **Make `sprint-merge` fail loudly** — drop the `|| true` after `gh pr create` (or assert a PR exists afterwards) so the workflow cannot report success having merged nothing. _Why:_ it silently swallowed "Actions is not permitted to create pull requests" twice on 2026-09-09; see `needs-human/2026-09-09-actions-cannot-open-prs.md`. _Size:_ S.
 
 ## Later (ideas)
@@ -38,3 +40,4 @@ Ordered. The Build agent takes the first unchecked item under **Now**. See [READ
 - [x] Open source: MIT, docs, community files, CI, release workflow (2026-09-09)
 - [x] Sprint infrastructure: manual, board, tests, e2e, auto-merge, escalation (2026-09-09)
 - [x] Summary templates: meeting, interview, lecture, sales call, journal, custom, per recording (2026-09-09, [#1](https://github.com/Nirmaypanchal/rapport/pull/1))
+- [x] Ask your library: a question answered from your transcripts, every claim linked to the moment (2026-09-10, [#7](https://github.com/Nirmaypanchal/rapport/pull/7))
