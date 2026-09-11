@@ -20,14 +20,14 @@ for pkg in ["mlx", "mlx_whisper", "mlx_lm", "pyannote.audio", "pyannote.core", "
         print("skip", pkg, e)
 for pkg in ["torch"]:
     hiddenimports += collect_submodules(pkg)
-for pkg in ["torch", "torchaudio", "transformers", "tokenizers", "huggingface_hub", "safetensors", "mlx", "mlx_lm", "mlx_whisper", "pyannote.audio", "lightning", "pytorch_lightning", "numpy", "scipy", "scikit-learn", "silero_vad", "fastapi", "uvicorn", "starlette", "pydantic", "tqdm", "filelock", "packaging", "pyyaml", "requests", "regex", "tiktoken", "sentencepiece", "protobuf"]:
+for pkg in ["rapport", "torch", "torchaudio", "transformers", "tokenizers", "huggingface_hub", "safetensors", "mlx", "mlx_lm", "mlx_whisper", "pyannote.audio", "lightning", "pytorch_lightning", "numpy", "scipy", "scikit-learn", "silero_vad", "fastapi", "uvicorn", "starlette", "pydantic", "tqdm", "filelock", "packaging", "pyyaml", "requests", "regex", "tiktoken", "sentencepiece", "protobuf"]:
     try:
         datas += copy_metadata(pkg)
     except Exception:
         pass
 hiddenimports += ["uvicorn.logging", "uvicorn.loops", "uvicorn.loops.auto", "uvicorn.protocols", "uvicorn.protocols.http", "uvicorn.protocols.http.auto",
                   "uvicorn.protocols.websockets", "uvicorn.protocols.websockets.auto", "uvicorn.lifespan", "uvicorn.lifespan.on", "multipart", "python_multipart",
-                  "rapport.sidecar", "sklearn.cluster", "sklearn.utils._typedefs", "sklearn.neighbors._partition_nodes", "scipy.special._cdflib"]
+                  "rapport.sidecar", "rapport.mcp", "sklearn.cluster", "sklearn.utils._typedefs", "sklearn.neighbors._partition_nodes", "scipy.special._cdflib"]
 
 # Static ffmpeg/ffprobe travel in bin/ next to the executable.
 binaries += [(str(BIN / "ffmpeg"), "bin"), (str(BIN / "ffprobe"), "bin")]

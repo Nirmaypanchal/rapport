@@ -11,9 +11,12 @@ Short version: **nothing you record.** Here is the complete list of network acti
 | Summaries with Ollama | 127.0.0.1:11434 | Local only | — |
 | Granola / Notion / Omi sync | Their APIs | Fetches *your* notes with *your* key. Nothing is sent except the request. | Don't add a key |
 | pyannote (optional) | huggingface.co | Downloads the gated pipeline once, with your token | Use the built-in engine |
+| An MCP client you connected | wherever that assistant runs | The transcripts, excerpts or summaries **it asks for**, as if you had pasted them in | Don't connect one, or point it at a local model |
 
 That's the whole list. There is no Rapport server, no analytics, no crash reporting, no account, no license check.
-Audio, transcripts, voice fingerprints, summaries and people never leave the machine.
+Rapport never sends your audio, transcripts, voice fingerprints, summaries or people anywhere. The one way words from
+your recordings can leave the Mac is if you connect a cloud assistant to the MCP server yourself, and then only what it
+reads — see [The MCP server](#the-mcp-server) below.
 
 ## What's stored, and where
 
@@ -29,6 +32,18 @@ They stay in the database.
 The Python backend listens on `127.0.0.1` only, never on a network interface. In the desktop app every request needs a
 random token generated at launch. Running from source (`./run.sh`) there is no token, so other processes on the same Mac
 could talk to it; use the app if that matters to you.
+
+## The MCP server
+
+The MCP server (`rapport-core --mcp`) opens no port at all: the assistant that uses it starts it as a child process and
+talks to it over that process's own stdin and stdout. It reads the library folder and nothing else, and every tool is
+read-only, so nothing an assistant does can change or delete a recording, a transcript or a person.
+
+What it cannot control is what the assistant then does with what it read. A cloud assistant — Claude, ChatGPT, Cursor —
+sends the excerpts, transcripts or summaries it asked for to its own servers, like anything else you paste into it. That
+is the one case where words from your recordings can leave the Mac, and it happens only for the recordings the assistant
+actually reads, only while you have it connected, and only because you configured it. A local model over MCP keeps
+everything here.
 
 ## macOS permissions
 

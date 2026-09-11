@@ -70,5 +70,5 @@ people share, filed under the person, with reminders that know why.
 ## Developers and tinkerers
 
 **Pain:** you want your own voice data in your own tools.
-**With Rapport:** everything is plain files and SQLite, the API is local HTTP, and the MCP server (roadmap) lets any LLM read
+**With Rapport:** everything is plain files and SQLite, the API is local HTTP, and the MCP server lets any LLM read
 and annotate your library. See [developers.md](developers.md).

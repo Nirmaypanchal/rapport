@@ -235,6 +235,10 @@ class Database:
         return out
 
     # ---- manual corrections -----------------------------------------------
+    def count_segments(self, rid: int) -> int:
+        """How many turns a recording has, without loading them (and their word timings) to find out."""
+        return self.connect().execute("SELECT COUNT(*) FROM segments WHERE recording_id=?", (rid,)).fetchone()[0]
+
     def get_segment(self, sid: int) -> dict | None:
         r = self.connect().execute("SELECT * FROM segments WHERE id=?", (sid,)).fetchone()
         if not r:

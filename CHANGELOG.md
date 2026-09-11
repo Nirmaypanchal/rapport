@@ -10,6 +10,11 @@ All notable changes to Rapport. The format follows Keep a Changelog; versions fo
   retrieval picks the moments, the local model writes a few sentences and cites each one, and every citation jumps to
   the excerpt and opens the recording where the words were said. With no local model installed you still get the
   moments that match. `POST /api/ask`.
+- **MCP server.** Claude, Cursor and any other MCP client can now search your recordings and read transcripts,
+  summaries and people, on your Mac, with no key and no network: `rapport-core --mcp`, or
+  `uv run python -m rapport.mcp` from a checkout. Six read-only tools — `search`, `list_recordings`,
+  `get_recording`, `get_transcript`, `get_summary`, `list_people`. Nothing an assistant does can change or delete
+  anything; write-back comes later. Setup for Claude Desktop is in [docs/integrations.md](docs/integrations.md).
 
 ## [0.1.0] - 2026-09-09
 

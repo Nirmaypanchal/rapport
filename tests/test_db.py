@@ -52,3 +52,14 @@ def test_schema_migrates_twice(library):
 
     Database(library.db_path)
     Database(library.db_path)  # reopening an existing library must be a no-op
+
+
+def test_count_segments_matches_the_segments(db):
+    rid = _rec(db, "counted.wav", "c" * 64)
+    assert db.count_segments(rid) == 0
+    db.replace_segments(rid, [
+        {"speaker": "SPEAKER_00", "start": 0.0, "end": 1.0, "text": "one"},
+        {"speaker": "SPEAKER_00", "start": 1.0, "end": 2.0, "text": "two"},
+    ])
+    assert db.count_segments(rid) == len(db.get_segments(rid)) == 2
+    assert db.count_segments(rid + 999) == 0
