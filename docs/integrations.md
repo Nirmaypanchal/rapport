@@ -1,8 +1,12 @@
 # Integrations
 
 Rapport pulls transcripts and recordings from the apps you already use into the same library as your device recordings,
-so search, people and summaries cover everything. All integrations are **read-only** and use **your own keys**;
-nothing is written back to any service, and nothing else leaves your Mac.
+so search, people and summaries cover everything. Every connector on this page is **read-only** and uses **your own
+keys**; nothing is written back to any service, and nothing else leaves your Mac.
+
+The one integration that works the other way round is the [MCP server](#mcp-server-your-recordings-inside-claude-cursor-or-any-mcp-client)
+below, which lets an assistant read *your* library — read-only too, but if that assistant runs in the cloud, what it
+reads reaches it.
 
 | Integration | What comes in | What you need |
 |---|---|---|
