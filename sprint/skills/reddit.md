@@ -1,5 +1,10 @@
 # Reddit (Last verified: 2026-09-10, second Community run)
 
+- **Still blocked as of 2026-09-11 (third Community run) — not re-tested, per this file's own advice.** Checked
+  `sprint/needs-human/2026-09-09-cloud-environment-blocks-reddit.md`: still open. Skipped the curl entirely this
+  run and went straight to GitHub-only listening, as this file says to. If a fourth run finds the escalation still
+  open, keep doing the same — there is no new information to gain from repeating a network probe whose cause
+  (an environment-level policy) nothing in this session can change.
 - **Still blocked as of 2026-09-10.** Re-ran the same `curl -A "rapport-sprint/1.0 …" .../new.json` request; still
   `CONNECT tunnel failed, response 403`, and `$HTTPS_PROXY/__agentproxy/status` still logs `connect_rejected` for
   `www.reddit.com:443`. No change since the escalation below was filed. Don't re-test this every run — check
