@@ -18,6 +18,7 @@ rapport/                 Python backend
   speakers.py            voice embeddings, people matching, reset/re-match
   summarize.py           Ollama / MLX summaries, the templates and the one-turn `chat()` both features use
   ask.py                 Ask your library: FTS retrieval, excerpt assembly, the prompt, citation parsing
+  mcp.py                 MCP server over stdio (read-only): search, recordings, transcripts, summaries, people
   connectors.py          Granola, Omi, Notion (read-only)
   recorder.py            live recording via ffmpeg avfoundation
   voicememos.py          Apple Voice Memos database and files
@@ -65,6 +66,29 @@ All routes are under `/api`, JSON, on 127.0.0.1. In the desktop app every call n
 | GET/PUT | `/api/settings` | settings |
 
 Read `rapport/server.py` for the complete list; every route is a few lines.
+
+## The MCP server
+
+`rapport/mcp.py` is a second, separate way in: an MCP client (Claude Desktop, Cursor, anything that speaks the
+protocol) starts it as a child process and talks JSON-RPC 2.0 over stdio, one message per line. It opens the SQLite
+library directly, so it needs no HTTP server, no token and no port, and it works whether or not the app is running.
+
+```bash
+uv run python -m rapport.mcp --library ~/Rapport   # from a checkout
+rapport-core --mcp                                 # the same code, from the frozen app
+```
+
+- The protocol is implemented in the standard library — `initialize`, `tools/list`, `tools/call`, and notifications,
+  which is all a tool server needs. No SDK, so the 1.3 GB bundle does not grow (`sprint/decisions.md`).
+- **Every tool is read-only.** No handler writes, and `tests/test_mcp.py` asserts that every table is unchanged after
+  all of them have run. Keep it that way until write-back ships with a confirmation in the UI.
+- A new tool is an entry in `TOOLS` (name, description, JSON Schema) and a `tool_*` function in `HANDLERS`; the two
+  are checked against each other by a test. Handlers return a plain dict and raise `ToolError` for anything the
+  caller got wrong — that comes back as a failed tool result the model can read, not a protocol error.
+- Retrieval is not duplicated: `search` is `rapport/ask.py`'s keyword extraction, FTS query and excerpt assembly in
+  an MCP envelope. Fix retrieval there and both features improve.
+- **Nothing but protocol may be written to stdout** (`print(..., file=sys.stderr)` for anything else), or the client
+  will see a parse error and drop the connection.
 
 ## Adding a source connector
 
@@ -154,7 +178,7 @@ the logs. Branches named `sprint/*` are merged automatically when CI passes; use
 ## Ideas that would be great contributions
 
 - CUDA/Linux backend with faster-whisper.
-- MCP server (`rapport/mcp.py`) exposing search, transcripts, summaries, and write-back for tags and summaries.
+- MCP write-back: `rapport/mcp.py` reads today; letting an assistant add a note, a tag or a summary is the next slice.
 - Summary templates (meeting, interview, lecture, sales call) selectable per recording.
 - Omi BLE streaming, Zoom/Meet local recording pickup, Obsidian export.
 - A Homebrew cask, signed releases, an auto-updater.

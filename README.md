@@ -19,6 +19,8 @@ Nothing is uploaded. No account. No subscription. MIT licensed.
 - **Ask your library a question.** "What did we decide about pricing?" is answered from your own transcripts by your own
   local model, with every claim linked to the moment it came from.
 - **Summaries with your own model.** Ollama if it's running, otherwise a small MLX model downloaded once. No API keys.
+- **Your recordings inside Claude or Cursor.** An MCP server, on your Mac, read-only: an assistant can search
+  your recordings and read transcripts, summaries and people, with no key and no network.
 - **Plain files you can see.** Originals, transcripts, people and settings live in one folder you can back up or delete.
 
 ![Rapport: a recording with speaker-labelled transcript, waveform and speaker lane](docs/screenshots/recording.png)
@@ -80,7 +82,7 @@ or add a connector: [docs/developers.md](docs/developers.md).
 - [Privacy](docs/privacy.md): exactly what touches the network, and what doesn't
 - [FAQ](docs/faq.md) and [Troubleshooting](docs/troubleshooting.md)
 - [For developers](docs/developers.md): architecture, API, adding sources and summarizers, desktop build
-- [Roadmap](docs/roadmap.md): people memory, MCP server, signed releases
+- [Roadmap](docs/roadmap.md): people memory, MCP write-back, signed releases
 
 ## Why open source
 

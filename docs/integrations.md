@@ -36,10 +36,61 @@ Keys are stored in `settings.json` inside your library folder.
 Sources → iCloud Drive / Dropbox / Google Drive shows the synced root; browse to the folder your phone recorder saves to and
 click **Watch this folder**. New audio is copied in on every poll.
 
+## MCP server: your recordings inside Claude, Cursor or any MCP client
+
+Rapport speaks the [Model Context Protocol](https://modelcontextprotocol.io), so an assistant can look things up in your
+own recordings while you talk to it: *"what did we agree about the Lisbon move?"*, *"read me the part where Maya
+explains the pricing"*, *"summarise every call with Tom this month"*.
+
+It runs on your Mac, reads the same library folder as the app, and needs no network and no key. The app does not have
+to be running. **Today every tool is read-only** — nothing an assistant does can change or delete a recording,
+a transcript, a summary or a person. Writing notes back is a later, opt-in step.
+
+One thing to know before you connect a cloud assistant: what it reads, it sends to its own servers, exactly as if you
+had pasted the transcript into the chat yourself. That is the only way words from your recordings can leave your Mac —
+see [Privacy](privacy.md#the-mcp-server).
+
+| Tool | What the assistant gets |
+|---|---|
+| `search` | The moments that match a question, each with the turn before and after, the recording id and the timestamp |
+| `list_recordings` | Recordings newest first, filtered by title or date |
+| `get_recording` | One recording: title, date, length, source, who speaks and for how long |
+| `get_transcript` | The transcript as speaker-labelled turns, or just the window you ask for |
+| `get_summary` | The summary Rapport wrote, as Markdown, with its template |
+| `list_people` | Everyone Rapport recognizes, with speaking time and when they were last heard |
+
+### Claude Desktop
+
+Settings → Developer → Edit Config, and add Rapport to `mcpServers` (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "rapport": {
+      "command": "/Applications/Rapport.app/Contents/Resources/core/rapport-core",
+      "args": ["--mcp"]
+    }
+  }
+}
+```
+
+Restart Claude Desktop; Rapport appears under the tools icon. Add `"--library", "/path/to/library"` to the `args` if your
+library is not in the default place (the Settings page shows where it is).
+
+### Cursor, Cline, and other clients
+
+Any client that starts an MCP server over stdio takes the same command. From a source checkout, run it with uv instead:
+
+```bash
+uv run python -m rapport.mcp --library ~/Rapport
+```
+
+It reads JSON-RPC on stdin and answers on stdout, so on its own in a terminal it will just sit there waiting — that is
+the protocol working, not a hang.
+
 ## Roadmap for integrations
 
-- **MCP server** so Claude, ChatGPT, Cursor and other assistants can search your recordings, read transcripts and summaries,
-  and write summaries or tags back. See [roadmap.md](roadmap.md).
+- **MCP write-back:** let an assistant add a note, a tag or a summary to a recording, with a confirmation in the app.
 - Zoom and Google Meet local recordings, Otter and Plaud direct connectors, Obsidian and Notion write-back.
 - Bluetooth streaming from Omi-style pendants.
 

@@ -29,7 +29,15 @@ def main() -> None:
     ap.add_argument("--token", default=os.environ.get("RAPPORT_TOKEN") or "")
     ap.add_argument("--ui", default=os.environ.get("RAPPORT_UI_DIR") or "", help="folder with the built web UI (frontend/out)")
     ap.add_argument("--log", default="info")
+    ap.add_argument("--mcp", action="store_true", help="serve the library to MCP clients over stdio instead of starting the app")
     args = ap.parse_args()
+
+    if args.mcp:
+        # Read-only, no worker, no importer, and stdout belongs to the protocol.
+        from .mcp import serve_library
+
+        sys.exit(serve_library(Path(args.library).expanduser() if args.library else None))
+
     if args.ui:
         os.environ["RAPPORT_UI_DIR"] = str(Path(args.ui).expanduser())
 

@@ -42,8 +42,9 @@ Not unless you switch on "Clear the mic after import" in Settings, and then only
 Anything in Ollama (Rapport uses whatever is running), or the built-in Qwen2.5-3B on MLX. Change it in Settings.
 
 **Can I use my own LLM or Claude on my library?**
-Soon: an MCP server that exposes recordings, transcripts and summaries to any assistant, and lets it write summaries and
-tags back. Today, everything is in SQLite and plain files, so scripts already work.
+Yes. Rapport ships an MCP server, so Claude, Cursor or any MCP client can search your recordings and read transcripts,
+summaries and people — locally, read-only, with no key and no network. See [integrations.md](integrations.md#mcp-server-your-recordings-inside-claude-cursor-or-any-mcp-client).
+Letting an assistant write back is the next step. Everything is also in SQLite and plain files, so scripts already work.
 
 **How big does the library get?**
 Originals dominate. DJI Mic files are ~700 MB per hour (32-bit float WAV); Voice Memos ~1 MB per minute. Transcripts are tiny.

@@ -8,8 +8,8 @@ read from it. Everything here stays local and free. Order is a guess; issues and
 - **People memory.** The small things people tell you (a daughter starting school, a marathon in October, a move to Lisbon),
   extracted by the local model, filed under the person, kept with the date and the recording it came from.
 - **Reminders that know why.** "Ask Sam how the marathon went", on your calendar, built from people memory.
-- **MCP server.** Claude, ChatGPT, Cursor and any MCP client can search recordings, read transcripts and summaries, and write
-  summaries, tags or people notes back. Runs inside the local backend; nothing new leaves the Mac.
+- **MCP write-back.** The read-only half has shipped (see Done); next an assistant can write a summary, a tag or a note
+  back to a recording, with a confirmation in the app.
 - **Signed, notarized releases** with an auto-updater, and a Homebrew cask.
 - **Templates you can edit in the app**, stored in the library folder instead of inside the app bundle.
 
@@ -30,3 +30,5 @@ read from it. Everything here stays local and free. Order is a guess; issues and
 - Native macOS app with a separate worker process and progress reporting.
 - Summary templates: meeting notes, interview, lecture, sales call, journal or your own prompt, per recording.
 - Ask your library: a question answered from your transcripts, with every claim linked to the moment it came from.
+- MCP server: Claude, Cursor and any MCP client can search your recordings and read transcripts, summaries and people,
+  read-only, on your Mac. See [integrations.md](integrations.md#mcp-server-your-recordings-inside-claude-cursor-or-any-mcp-client).
