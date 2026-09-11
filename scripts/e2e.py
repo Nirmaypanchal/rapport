@@ -94,7 +94,9 @@ def main() -> int:
             raise SystemExit("backend never became healthy; see " + str(tmp / "backend.log"))
         fixture = make_fixture(tmp)
         ids = api(base, token, "/api/import/path", {"path": str(fixture)})
-        rid = (ids.get("ids") if isinstance(ids, dict) else ids)[0]
+        imported = ids.get("imported") if isinstance(ids, dict) else ids
+        assert imported, f"import returned no recording: {ids}"
+        rid = imported[0]
         t1 = time.time()
         rec = None
         while time.time() - t1 < timeout:
@@ -127,3 +129,7 @@ def main() -> int:
         log.close()
         if not a.keep:
             shutil.rmtree(tmp, ignore_errors=True)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

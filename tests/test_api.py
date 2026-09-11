@@ -11,6 +11,9 @@ class _Worker:
     def status(self):
         return {"state": "idle"}
 
+    def wake(self):
+        pass
+
     def summarize_later(self, rid):
         self.queued.append(rid)
         return True
@@ -117,3 +120,20 @@ def test_summarize_requires_a_processed_recording(library, db):
     rid = db.insert_recording(sha256="3" * 64, original_name="z.wav", rel_path="audio/z.wav", status="queued")
     assert _client(library, db).post(f"/api/recordings/{rid}/summarize", json={}).status_code == 409
     assert _client(library, db).post("/api/recordings/9999/summarize", json={}).status_code == 404
+
+
+def test_import_path_returns_the_imported_ids(library, db, tmp_path):
+    """`POST /api/import/path` answers `{"imported": [id, ...]}`. scripts/e2e.py reads that key by hand,
+    so pin it here: it read the wrong one for a day and only the nightly noticed."""
+    import wave
+
+    src = tmp_path / "TX01_MIC001_20260909_090000_e2e.wav"
+    with wave.open(str(src), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(16000)
+        w.writeframes(b"\x00\x00" * 16000)
+
+    body = _client(library, db).post("/api/import/path", json={"path": str(src)}).json()
+    assert list(body) == ["imported"]
+    assert body["imported"] and db.get_recording(body["imported"][0])["original_name"] == src.name
