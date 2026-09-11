@@ -215,14 +215,14 @@ footer{margin-top:0;border-top:1px solid var(--hairline);padding:28px 0 56px;fon
       <div class="hits"><div class="hit" id="hit0"></div><div class="hit" id="hit1"></div></div></div>
   </div>
   <div class="feature" id="f-mcp">
-    <div class="copy"><span class="pill soon tag">coming next</span><h2>Ask about it from the AI you already use.</h2><p>Rapport ships an MCP server. Claude, ChatGPT or Cursor can read your recordings, transcripts and summaries, and write summaries or tags back. No extra AI subscription.</p></div>
+    <div class="copy"><h2>Ask about it from the AI you already use.</h2><p>Rapport ships an MCP server. Claude, Cursor or any MCP client can search your recordings and read transcripts, summaries and people &mdash; on your Mac, read-only, no key, no port. No extra AI subscription.</p></div>
     <div class="card chat"><div class="chatlog" id="chat">
       <div class="msg user">What did Maya say about pricing last week?</div>
-      <div class="tool"><i></i>rapport.search_transcripts("pricing", since: "7d")</div>
+      <div class="tool"><i></i>rapport.search("pricing", since: "7d")</div>
       <div class="msg ai">Maya wants two tiers locked before Friday, with onboarding in the second tier. You said you'd send numbers that night. <span class="tc" style="color:var(--ink-3)">Call with Maya · 0:11</span></div>
-      <div class="msg user">Tag it "pricing" and rewrite the summary for sales.</div>
-      <div class="tool"><i></i>rapport.update_recording(tags: ["pricing"], summary_template: "sales")</div>
-      <div class="msg ai">Done. Tag added; the summary now follows the sales template.</div>
+      <div class="msg user">Send me the full summary from that call.</div>
+      <div class="tool"><i></i>rapport.get_summary(recording: "Call with Maya")</div>
+      <div class="msg ai">Here's the summary Rapport wrote &mdash; key points, action items and quotes, linked back to the call.</div>
     </div></div>
   </div>
   <div class="feature" id="f-memory">
@@ -259,7 +259,7 @@ footer{margin-top:0;border-top:1px solid var(--hairline);padding:28px 0 56px;fon
     <p class="muted" style="margin-top:8px">Every feature, every future feature, no tiers. Open source under the MIT license.</p>
     <div style="margin-top:20px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap"><a class="btn primary" href="https://github.com/Nirmaypanchal/rapport/releases"><svg viewBox="0 0 24 24" aria-hidden><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>Download for Mac</a><a class="btn" href="https://github.com/Nirmaypanchal/rapport">Source on GitHub</a></div>
     <div style="margin-top:10px;font-size:12.5px;color:var(--ink-3)">macOS 14+, Apple silicon. Models download on first run.</div>
-    <ul><li>Meetings and voice memos, transcribed on your Mac</li><li>Speakers named across recordings</li><li>Summaries with a local model</li><li>Search, skip silences, export</li><li>Granola, Notion and Omi connectors</li><li>MCP server and people memory when they ship</li></ul>
+    <ul><li>Meetings and voice memos, transcribed on your Mac</li><li>Speakers named across recordings</li><li>Ask your library a question, every claim linked to the moment</li><li>Summaries with a local model</li><li>Search, skip silences, export</li><li>Granola, Notion and Omi connectors</li><li>MCP server for Claude, Cursor and any MCP client</li><li>People memory when it ships</li></ul>
   </div>
   <div class="faq">
     <details><summary>Does anything leave my Mac?</summary><p>No. Models download once and run locally. The only outbound calls are connectors you enable with your own keys, like fetching your Granola notes. The <a href="https://github.com/Nirmaypanchal/rapport/blob/main/docs/privacy.md" style="text-decoration:underline">privacy page</a> lists every network call.</p></details>
