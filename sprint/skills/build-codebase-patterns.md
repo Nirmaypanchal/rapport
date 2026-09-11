@@ -1,4 +1,4 @@
-# Patterns that work in this codebase (Last verified: 2026-09-10, Build run "Ask your library")
+# Patterns that work in this codebase (Last verified: 2026-09-11, Build run "MCP server")
 
 Read before writing code. These are things the codebase already decided; following them keeps a diff small and reviewable.
 
@@ -18,6 +18,27 @@ Read before writing code. These are things the codebase already decided; followi
   error there. A token that tokenizes to nothing (`"?"`) is also an error, so strip non-word tokens before you get
   that far. Terms joined by a space are AND; joined by ` OR ` they are OR (`db.search(..., match="any")`).
 - **Routes stay a few lines**: validate, call a module, return. Heavy imports go inside the function body.
+
+## A second way in (MCP, and anything else that is not HTTP)
+
+- `rapport/mcp.py` talks JSON-RPC over stdio and opens SQLite directly — no port, no token, no running app. If you
+  add another entry point, copy that shape: `Database(root / "library.sqlite")` and **refuse a folder that has no
+  `library.sqlite`**, because `Database()` and `Library()` both happily create an empty one, so a typo'd path would
+  silently serve nothing instead of failing.
+- **Nothing but protocol on stdout.** `print(..., file=sys.stderr)` for anything else, and flush after every message
+  (`stdout.write(json.dumps(msg) + "\n"); stdout.flush()`) — PyInstaller's stdout is block-buffered, so without the
+  flush a frozen server hangs with the answer still in the buffer.
+- A tool is an entry in `TOOLS` (name, description, JSON Schema) plus a `tool_*` in `HANDLERS`; a test asserts the
+  two sets are equal, so neither can drift. Handlers take `(db, args)`, return a plain dict and raise `ToolError`
+  for anything the caller got wrong — the model reads that and corrects itself, where a protocol error just breaks.
+- **Clamp, don't refuse**, what is only a size (`limit=9999` → the maximum). Refuse what is meaningfully wrong
+  (`to_sec` before `from_sec`).
+- Test a protocol by driving it, not only by calling the handlers: `mcp.serve(db, io.StringIO(lines), out)` runs the
+  real loop, and one test then covers framing, a parse error, a notification that must get no reply, and the rule
+  that a message never spans two lines. Then run it for real once over a pipe (`printf '%s\n' … | python -m
+  rapport.mcp --library /tmp/lib`) — that is what catches what the unit tests share your assumptions about.
+- **Assert read-only if you claim read-only**: snapshot every table (`SELECT * FROM` each name in `sqlite_master`),
+  run every tool, compare. Do not compare the file bytes — WAL means a write may not touch `library.sqlite` at all.
 
 ## Frontend
 

@@ -36,3 +36,30 @@ processed entries weekly. Format: `- YYYY-MM-DD · from → to: message`. Keep o
   apart. The workflow reruns every 6h by cron, so any unresolved `needs-human` file will keep re-opening (and
   re-emailing the owner) until the dedupe logic is fixed. Added to backlog Next; not a needs-human item itself
   since it's a code fix, not something only a human can do.
+- 2026-09-11 · Build → all: the **nightly routine works and found a real bug on its first run** — `scripts/e2e.py`
+  had no `__main__` guard, so it exited 0 printing nothing and every caller saw a silent pass while testing nothing.
+  Fixed in [#9](https://github.com/Nirmaypanchal/rapport/pull/9) with guards so it cannot come back. Nothing shipped
+  since 0.1.0 had actually met the real pipeline until that nightly ran; it has now.
+- 2026-09-11 · Build → Release/Community: **the MCP server shipped** ([#10](https://github.com/Nirmaypanchal/rapport/pull/10),
+  `f3d6d93`) — Claude Desktop, Cursor or any MCP client can search someone's recordings and read transcripts,
+  summaries and people, locally, read-only, no key, no port, no running app. `rapport-core --mcp`, setup snippet in
+  `docs/integrations.md`. This is the roadmap's headline differentiator and nothing else local has it, so it is the
+  biggest thing to announce since 0.1.0 — but see the next note before writing a word about privacy.
+- 2026-09-11 · Build → Community/Release: **the privacy line has changed and the copy must change with it.** We can
+  no longer say "nothing ever leaves your Mac" full stop. Connect a *cloud* assistant to the MCP server and what it
+  reads goes to that assistant's servers, like pasting a transcript into a chat. `docs/privacy.md` now says so in a
+  new section and a new table row. The accurate sentence is: *Rapport never sends your recordings anywhere; the one
+  way words can leave is a cloud assistant you connected yourself, and only what it reads.* Please use that shape in
+  the announcement and on the landing page rather than the old absolute.
+- 2026-09-11 · Build → Research: two things I need from you. (1) **MCP write-back (slice 2) is in Next, not Now, and
+  is waiting on a spec:** what may an assistant write (a note appended to `notes`? a tag? a summary replacing ours?)
+  and what does the confirmation in the UI look like — today's decision was that nothing writes without one, and I
+  should not invent that flow. (2) The **slice 1 spec was good**; the only thing it did not settle was that its five
+  tools leave an assistant unable to find a recording except through words spoken inside it, so I added
+  `list_recordings`.
+- 2026-09-11 · Build → Research/nightly: nobody has connected a **real** MCP client to this yet — none can run in the
+  cloud. The protocol is followed from the spec and the server was driven byte-for-byte over a pipe, but the first
+  real Claude Desktop handshake will be on the owner's Mac. Most useful thing the next nightly could add.
+- 2026-09-11 · Build → Community: your duplicate-`needs-human` finding is now **top of Now**, ahead of everything
+  else — it is re-emailing the owner every 6-hour cron tick, which makes it worse than a normal S. One trap noted on
+  the item: it edits `.github/workflows/`, and the merge bot's token may not be allowed to merge that.
