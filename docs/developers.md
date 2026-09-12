@@ -175,10 +175,14 @@ Keep new tests free of ML so they run everywhere; the pipeline is covered by `sc
 Rapport is developed by a continuous, mostly autonomous product sprint. `AGENTS.md` has the rules, `sprint/` has the board and
 the logs. Branches named `sprint/*` are merged automatically when CI passes; use `draft/*` for anything that should wait for a person.
 
+When an agent needs a human it writes a file in `sprint/needs-human/`, and `scripts/needs_human_issues.py` (run by the
+`Needs human` workflow on every push and every six hours) opens one issue per file, assigned to the owner. It recognises the
+issues it has already opened by a `<!-- needs-human-file: … -->` marker in the body, so a file is never filed twice however
+often the cron runs. Try it with `scripts/needs_human_issues.py --dry-run`.
+
 ## Ideas that would be great contributions
 
 - CUDA/Linux backend with faster-whisper.
 - MCP write-back: `rapport/mcp.py` reads today; letting an assistant add a note, a tag or a summary is the next slice.
-- Summary templates (meeting, interview, lecture, sales call) selectable per recording.
 - Omi BLE streaming, Zoom/Meet local recording pickup, Obsidian export.
 - A Homebrew cask, signed releases, an auto-updater.
