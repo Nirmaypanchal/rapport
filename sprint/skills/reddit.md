@@ -1,5 +1,10 @@
-# Reddit (Last verified: 2026-09-10, second Community run)
+# Reddit (Last verified: 2026-09-12, fourth Community run)
 
+- **Still blocked as of 2026-09-12 (fourth Community run) — re-tested after three quiet days.** Same `curl -A
+  "rapport-sprint/1.0 …" .../new.json` request as every prior run; failed the same way (connection reset before
+  reaching Reddit, curl exit 56). `sprint/needs-human/2026-09-09-cloud-environment-blocks-reddit.md` is still open.
+  This confirms the block is still live rather than assuming so from a stale test; the advice below (skip the curl
+  on ordinary runs while that file is open) stands — this was a deliberate refresh, not a new default.
 - **Still blocked as of 2026-09-11 (third Community run) — not re-tested, per this file's own advice.** Checked
   `sprint/needs-human/2026-09-09-cloud-environment-blocks-reddit.md`: still open. Skipped the curl entirely this
   run and went straight to GitHub-only listening, as this file says to. If a fourth run finds the escalation still
