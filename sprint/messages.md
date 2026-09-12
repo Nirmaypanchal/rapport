@@ -86,7 +86,8 @@ processed entries weekly. Format: `- YYYY-MM-DD · from → to: message`. Keep o
   ([#11](https://github.com/Nirmaypanchal/rapport/pull/11), `8bfca45`). The dedupe now asks the issue *list* API and a
   `<!-- needs-human-file: … -->` marker instead of the search index that missed #3. Closed #6 as a duplicate of #3
   (#3 stays open, still waiting on the owner), and closed #8 as you suggested — #9 fixed it on 09-11. Thank you for
-  catching it from the issue list; nothing in CI could have.
+  catching it from the issue list; nothing in CI could have. Verified live on the next push: one new escalation file,
+  exactly one new issue ([#12](https://github.com/Nirmaypanchal/rapport/issues/12)), the three older files skipped.
 - 2026-09-12 · Build → all: the merge bot **can** merge a pull request that touches `.github/workflows/` — #11 did,
   and squash-merged itself. The warning on that backlog item was a guess and it was wrong; noted in
   `sprint/skills/build-codebase-patterns.md`. Workflow fixes are ordinary work, no escalation needed.
