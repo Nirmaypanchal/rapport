@@ -16,14 +16,14 @@ rapport/                 Python backend
   transcribe.py          Whisper on MLX (progress via its tqdm hook)
   diarize.py             built-in diarizer (Silero + WeSpeaker + clustering) and pyannote wrapper
   speakers.py            voice embeddings, people matching, reset/re-match
-  summarize.py           Ollama / MLX summaries, the templates and the one-turn `chat()` both features use
-  ask.py                 Ask your library: FTS retrieval, excerpt assembly, the prompt, citation parsing
+  summarize.py           Ollama / MLX summaries, the templates, splitting a summary into citable blocks, `chat()`
+  ask.py                 Ask your library: FTS retrieval over turns and summaries, excerpts, the prompt, citations
   mcp.py                 MCP server over stdio (read-only): search, recordings, transcripts, summaries, people
   connectors.py          Granola, Omi, Notion (read-only)
   recorder.py            live recording via ffmpeg avfoundation
   voicememos.py          Apple Voice Memos database and files
   dji.py                 DJI and removable-volume detection, file-name parsing
-  db.py                  SQLite schema, migrations, queries (FTS5 search)
+  db.py                  SQLite schema, migrations, queries (FTS5 over turns and summary blocks)
   config.py              settings, library paths
 frontend/                Next.js 16 app (static export), Tailwind v4, shadcn/ui on Base UI
 desktop/sidecar/         PyInstaller spec and build script → rapport-core
@@ -85,8 +85,9 @@ rapport-core --mcp                                 # the same code, from the fro
 - A new tool is an entry in `TOOLS` (name, description, JSON Schema) and a `tool_*` function in `HANDLERS`; the two
   are checked against each other by a test. Handlers return a plain dict and raise `ToolError` for anything the
   caller got wrong — that comes back as a failed tool result the model can read, not a protocol error.
-- Retrieval is not duplicated: `search` is `rapport/ask.py`'s keyword extraction, FTS query and excerpt assembly in
-  an MCP envelope. Fix retrieval there and both features improve.
+- Retrieval is not duplicated: `search` is `rapport/ask.py`'s keyword extraction and `retrieve()` in an MCP
+  envelope. Fix retrieval there and both features improve. Its results carry a `kind`: a `moment` has a timestamp,
+  a `summary` block does not.
 - **Nothing but protocol may be written to stdout** (`print(..., file=sys.stderr)` for anything else), or the client
   will see a parse error and drop the connection.
 
@@ -131,6 +132,11 @@ Output Markdown with exactly these sections:
 ## Yesterday
 …
 ```
+
+Whatever shape a template asks for, keep the summary in Markdown blocks — headings, bullets, paragraphs.
+`split_summary()` cuts it there, and `db.index_summary()` (called from `insert_recording`/`update_recording`, so no
+writer has to remember) stores the blocks in `summary_chunks` for Ask and the MCP `search` tool to cite. A summary
+written as one 5,000-character wall still works: blocks longer than `MAX_BLOCK_CHARS` are cut on sentence ends.
 
 Drop the file in and it appears in the Summary tab and in Settings; nothing else to register. A recording remembers the
 template it was summarized with in `recordings.summary_template`, and users can write their own prompt instead

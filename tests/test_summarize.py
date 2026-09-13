@@ -1,15 +1,18 @@
-"""Summary templates: loading the shipped Markdown files and assembling the prompt.
+"""Summaries: loading the shipped templates, assembling the prompt, and cutting a written summary
+into the blocks the search index and Ask cite.
 
 Nothing here talks to a model; only the prompt that would be sent is checked.
 """
 from rapport.summarize import (
     CUSTOM_TEMPLATE,
     DEFAULT_TEMPLATE,
+    MAX_BLOCK_CHARS,
     PREAMBLE,
     _parse_template,
     build_system,
     builtin_templates,
     get_template,
+    split_summary,
     templates,
 )
 
@@ -72,3 +75,48 @@ def test_build_system_with_a_custom_prompt():
 def test_every_template_produces_a_distinct_prompt():
     systems = {t.id: build_system(t) for t in builtin_templates()}
     assert len(set(systems.values())) == len(systems)
+
+
+# ---- cutting a summary into citable blocks --------------------------------
+
+SUMMARY = """# Pricing sync
+
+## Decisions
+
+- We settled the pricing at forty euros a seat.
+  Maya pushed back on fifty.
+  - Nirmay redoes the deck
+- Launch stays on the fourth of October.
+
+**Open questions**
+
+Nobody knows who signs the contract.
+
+## Next steps
+1. Send the deck before Friday.
+2) Book a follow-up.
+"""
+
+
+def test_split_summary_keeps_one_thought_per_block_under_its_heading():
+    blocks = split_summary(SUMMARY)
+    assert [h for h, _ in blocks] == ["Decisions", "Decisions", "Open questions", "Next steps", "Next steps"]
+    assert blocks[0][1] == "We settled the pricing at forty euros a seat.\nMaya pushed back on fifty.\n- Nirmay redoes the deck", \
+        "a wrapped line and a sub-bullet stay with the item they belong to"
+    assert blocks[1][1] == "Launch stays on the fourth of October."
+    assert blocks[3][1] == "Send the deck before Friday.", "the list marker is not part of the text"
+    assert all(not t.startswith(("#", "-", "*")) for _, t in blocks), "a heading is a label, never a block"
+
+
+def test_split_summary_handles_plain_prose_and_nothing_at_all():
+    assert split_summary("Just one paragraph,\nwrapped over two lines.") == [(None, "Just one paragraph,\nwrapped over two lines.")]
+    assert split_summary("First.\n\nSecond.") == [(None, "First."), (None, "Second.")]
+    assert split_summary(None) == [] and split_summary("") == [] and split_summary("  \n\n ") == []
+    assert split_summary("## Decisions\n") == [], "a heading with nothing under it indexes nothing"
+
+
+def test_split_summary_cuts_a_very_long_block_on_sentence_ends():
+    blocks = split_summary("One sentence that says something. " * 60)
+    assert len(blocks) > 1 and all(len(t) <= MAX_BLOCK_CHARS for _, t in blocks)
+    assert all(t.endswith(".") for _, t in blocks), "cuts land between sentences, not mid-word"
+    assert "".join(t for _, t in blocks).count("One sentence") == 60, "nothing is lost in the cutting"

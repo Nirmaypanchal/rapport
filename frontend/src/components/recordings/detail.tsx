@@ -23,7 +23,7 @@ const TABS = ["transcript", "summary", "details", "actions", "notes"] as const;
 type Tab = (typeof TABS)[number];
 const LS_TAB = "recordingTab";
 
-export function RecordingDetail({ id, seekTo, onListChanged }: { id: number; seekTo?: number; onListChanged: () => void }) {
+export function RecordingDetail({ id, seekTo, openTab, onListChanged }: { id: number; seekTo?: number; openTab?: string; onListChanged: () => void }) {
   const router = useRouter();
   const { confirm } = useConfirm();
   const { data: status } = useStatus();
@@ -38,6 +38,8 @@ export function RecordingDetail({ id, seekTo, onListChanged }: { id: number; see
   const [notes, setNotes] = useState("");
   const [tab, setTab] = useState<Tab>("transcript");
   useEffect(() => { try { const t = localStorage.getItem(LS_TAB) as Tab | null; if (t && TABS.includes(t)) setTab(t); } catch {} }, []);
+  // A link that asks for a tab (a cited summary, say) wins over whichever one was left open last.
+  useEffect(() => { if (openTab && TABS.includes(openTab as Tab)) setTab(openTab as Tab); }, [openTab, id]);
   useEffect(() => { if (r) { setTitle(r.title ?? ""); setNotes(r.notes ?? ""); } }, [r?.id, r?.title, r?.notes]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {

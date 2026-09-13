@@ -56,7 +56,7 @@ see [Privacy](privacy.md#the-mcp-server).
 
 | Tool | What the assistant gets |
 |---|---|
-| `search` | The moments that match a question, each with the turn before and after, the recording id and the timestamp |
+| `search` | What matches a question: `moment` results (the turn with the turn before and after, the recording id and the timestamp) and `summary` results (a block of the summary Rapport wrote, which often states the outcome outright) |
 | `list_recordings` | Recordings newest first, filtered by title or date |
 | `get_recording` | One recording: title, date, length, source, who speaks and for how long |
 | `get_transcript` | The transcript as speaker-labelled turns, or just the window you ask for |

@@ -75,18 +75,27 @@ Search is SQLite full-text search across every transcript; a hit opens the recor
 Search finds the words you type. **Ask** (the second tab on the Search page) answers a question in your own words, from
 your own recordings:
 
-1. The question is reduced to its meaningful words and put to the same full-text index, this time needing only *some*
+1. The question is reduced to its meaningful words and put to the full-text index, this time needing only *some*
    of them to match — a question is not a phrase you once said.
-2. The best hits become **excerpts**: the turn that matched plus the turn on each side, so the moment reads as a moment.
-   At most two come from any one recording, so a long meeting cannot crowd out the rest, and at most eight in all.
+2. The best hits become **excerpts**, of two kinds. A **moment** is what was said: the turn that matched plus the turn
+   on each side, so it reads as a moment; at most two come from any one recording, so a long meeting cannot crowd out
+   the rest. A **summary** excerpt is one block of the summary Rapport already wrote for a recording — what a meeting
+   decided is usually stated there in a sentence, where the transcript takes five minutes to arrive at it, and
+   sometimes in words nobody actually said out loud. Up to three summaries lead, one per recording, and moments fill
+   the rest; eight excerpts in all.
 3. Those excerpts — and nothing else — are given to the local model with the question, and it is asked to answer in a
-   few sentences and to cite each one as `[1]`, `[2]`.
+   few sentences and to cite each one as `[1]`, `[2]`. The model is told which excerpts are summaries, so it can say
+   "the summary says" rather than put words in anyone's mouth.
 
-Every citation is a button: it jumps to the excerpt, and the excerpt opens the recording a second before the words were
-said, so you can hear it for yourself. Excerpts the answer did not use are still listed, dimmed.
+Every citation is a button: it jumps to the excerpt. A moment opens the recording a second before the words were said,
+so you can hear it for yourself; a summary has no second to jump to, so it opens that recording's Summary tab.
+Excerpts the answer did not use are still listed, dimmed.
 
-**With no local model** you still get the excerpts, listed as "moments that match" — the retrieval is the useful half,
-and nothing is invented to paper over a missing model. If the model fails or returns nothing, the excerpts remain too.
+Summaries are indexed as they are written, block by block — a bullet or a paragraph, under whatever heading it sits.
+Rewriting a summary replaces what was indexed, so nothing you have regenerated away can come back as a source.
+
+**With no local model** you still get the excerpts — the retrieval is the useful half, and nothing is invented to paper
+over a missing model. If the model fails or returns nothing, the excerpts remain too.
 
 Nothing leaves the Mac: the index is your SQLite file, and the model is Ollama or MLX on your own hardware. The answer
 is written by a small local model reading only what it was handed, so treat it as a fast way to find the moment rather

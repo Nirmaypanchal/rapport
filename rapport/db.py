@@ -85,6 +85,32 @@ CREATE TRIGGER IF NOT EXISTS segments_ad AFTER DELETE ON segments BEGIN
     INSERT INTO segments_fts(segments_fts, rowid, text) VALUES ('delete', old.id, old.text);
 END;
 
+-- A summary written by the local model, cut into the blocks it is written in (see summarize.split_summary),
+-- so "what did we decide" can be answered by the sentence that already says so. Filled by index_summary()
+-- whenever a summary is written: a trigger cannot split Markdown, so the splitting happens in Python.
+CREATE TABLE IF NOT EXISTS summary_chunks (
+    id INTEGER PRIMARY KEY,
+    recording_id INTEGER NOT NULL REFERENCES recordings(id) ON DELETE CASCADE,
+    idx INTEGER NOT NULL,
+    heading TEXT,                 -- the heading this block is written under, if the summary has any
+    text TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS summary_chunks_rec ON summary_chunks(recording_id, idx);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS summary_chunks_fts USING fts5(
+    text, content='summary_chunks', content_rowid='id', tokenize='porter unicode61'
+);
+CREATE TRIGGER IF NOT EXISTS summary_chunks_ai AFTER INSERT ON summary_chunks BEGIN
+    INSERT INTO summary_chunks_fts(rowid, text) VALUES (new.id, new.text);
+END;
+CREATE TRIGGER IF NOT EXISTS summary_chunks_au AFTER UPDATE OF text ON summary_chunks BEGIN
+    INSERT INTO summary_chunks_fts(summary_chunks_fts, rowid, text) VALUES ('delete', old.id, old.text);
+    INSERT INTO summary_chunks_fts(rowid, text) VALUES (new.id, new.text);
+END;
+CREATE TRIGGER IF NOT EXISTS summary_chunks_ad AFTER DELETE ON summary_chunks BEGIN
+    INSERT INTO summary_chunks_fts(summary_chunks_fts, rowid, text) VALUES ('delete', old.id, old.text);
+END;
+
 CREATE TABLE IF NOT EXISTS log (
     id INTEGER PRIMARY KEY,
     ts TEXT NOT NULL,
@@ -106,6 +132,7 @@ class Database:
             c.executescript(SCHEMA)
         self._migrate_colors()
         self._migrate_columns()
+        self._index_unindexed_summaries()
 
     def _migrate_columns(self) -> None:
         c = self.connect()
@@ -172,7 +199,10 @@ class Database:
         c = self.connect()
         with c:
             cur = c.execute(f"INSERT INTO recordings({keys}) VALUES ({qs})", tuple(cols.values()))
-            return cur.lastrowid
+            rid = cur.lastrowid
+        if cols.get("summary"):  # a note that arrives with its summary already written (Granola, Omi, Notion)
+            self.index_summary(rid, cols["summary"])
+        return rid
 
     def update_recording(self, rid: int, **cols) -> None:
         if not cols:
@@ -181,6 +211,8 @@ class Database:
         c = self.connect()
         with c:
             c.execute(f"UPDATE recordings SET {sets} WHERE id=?", (*cols.values(), rid))
+        if "summary" in cols:  # every writer goes through here, so the index cannot drift from the text
+            self.index_summary(rid, cols["summary"])
 
     def get_recording(self, rid: int) -> dict | None:
         r = self.connect().execute("SELECT * FROM recordings WHERE id=?", (rid,)).fetchone()
@@ -208,6 +240,45 @@ class Database:
         c = self.connect()
         with c:
             c.execute("DELETE FROM recordings WHERE id=?", (rid,))
+
+    # ---- summaries in the search index ------------------------------------
+    def index_summary(self, rid: int, summary: str | None = None) -> int:
+        """(Re)index one recording's summary as searchable blocks. Returns how many there are.
+
+        Called by `insert_recording` and `update_recording` whenever the text changes; clearing a summary
+        clears its blocks. Pass `summary` to save a read when the caller already has the text.
+        """
+        from .summarize import split_summary
+
+        if summary is None:
+            row = self.connect().execute("SELECT summary FROM recordings WHERE id=?", (rid,)).fetchone()
+            summary = row["summary"] if row else None
+        blocks = split_summary(summary)
+        c = self.connect()
+        with c:
+            c.execute("DELETE FROM summary_chunks WHERE recording_id=?", (rid,))
+            c.executemany(
+                "INSERT INTO summary_chunks(recording_id, idx, heading, text) VALUES (?,?,?,?)",
+                [(rid, i, heading, text) for i, (heading, text) in enumerate(blocks)],
+            )
+        return len(blocks)
+
+    def _index_unindexed_summaries(self) -> int:
+        """Index summaries written before this index existed. Nothing to do on an already-indexed library."""
+        rows = self.connect().execute(
+            """SELECT id, summary FROM recordings
+               WHERE summary IS NOT NULL AND TRIM(summary) != ''
+                 AND id NOT IN (SELECT recording_id FROM summary_chunks)"""
+        ).fetchall()
+        for r in rows:
+            self.index_summary(r["id"], r["summary"])
+        return len(rows)
+
+    def summary_chunks(self, rid: int) -> list[dict]:
+        rows = self.connect().execute(
+            "SELECT id, idx, heading, text FROM summary_chunks WHERE recording_id=? ORDER BY idx", (rid,)
+        ).fetchall()
+        return [dict(r) for r in rows]
 
     # ---- segments & speakers --------------------------------------------
     def replace_segments(self, rid: int, segments: list[dict]) -> None:
@@ -444,15 +515,24 @@ class Database:
         return [dict(r) for r in rows]
 
     # ---- search ----------------------------------------------------------
+    @staticmethod
+    def _fts_query(query: str, match: str) -> str | None:
+        """An FTS5 MATCH expression, or None when there is nothing to search for.
+
+        Every term is quoted: punctuation a user typed is a syntax error in the FTS grammar otherwise.
+        """
+        q = query.strip()
+        if not q:
+            return None
+        joiner = " OR " if match == "any" else " "
+        return joiner.join('"' + t.replace('"', '""') + '"' for t in q.split())
+
     def search(self, query: str, limit: int = 100, match: str = "all") -> list[dict]:
         """Full-text search over every turn. `match='all'` needs every term (the Search page);
         `match='any'` ranks whatever matches most of them (a question, where no one word is required)."""
-        q = query.strip()
-        if not q:
+        terms = self._fts_query(query, match)
+        if terms is None:
             return []
-        # Quote each term so punctuation in user input doesn't break the FTS grammar.
-        joiner = " OR " if match == "any" else " "
-        terms = joiner.join('"' + t.replace('"', '""') + '"' for t in q.split())
         rows = self.connect().execute(
             """SELECT s.id, s.recording_id, s.speaker_label, s.start, s.end,
                       snippet(segments_fts, 0, '[[', ']]', '…', 14) AS snippet,
@@ -465,6 +545,25 @@ class Database:
                LEFT JOIN people p ON p.id = rs.person_id
                WHERE segments_fts MATCH ?
                ORDER BY bm25(segments_fts) LIMIT ?""",
+            (terms, limit),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def search_summaries(self, query: str, limit: int = 20, match: str = "all") -> list[dict]:
+        """The same search over the blocks of written summaries. A question about what a meeting decided is
+        often answered by the summary that already says so, where no single turn does."""
+        terms = self._fts_query(query, match)
+        if terms is None:
+            return []
+        rows = self.connect().execute(
+            """SELECT sc.id, sc.recording_id, sc.idx, sc.heading, sc.text,
+                      snippet(summary_chunks_fts, 0, '[[', ']]', '…', 20) AS snippet,
+                      r.title, r.original_name, r.recorded_at
+               FROM summary_chunks_fts
+               JOIN summary_chunks sc ON sc.id = summary_chunks_fts.rowid
+               JOIN recordings r ON r.id = sc.recording_id
+               WHERE summary_chunks_fts MATCH ?
+               ORDER BY bm25(summary_chunks_fts) LIMIT ?""",
             (terms, limit),
         ).fetchall()
         return [dict(r) for r in rows]

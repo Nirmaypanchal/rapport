@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Sparkles } from "lucide-react";
+import { FileText, Sparkles } from "lucide-react";
 import { api, type AskAnswer, type AskSource } from "@/lib/api";
 import { fmtDate, fmtTime } from "@/lib/format";
 import { speakerStyle } from "@/lib/speakers";
@@ -53,7 +53,7 @@ export function AskPanel({ active }: { active: boolean }) {
               <button key={x} type="button" onClick={() => { setQ(x); ask(x); }} className="rounded-full border border-hairline bg-surface px-3 py-1.5 text-[13px] text-ink-2 transition-colors hover:border-signal hover:text-ink">{x}</button>
             ))}
           </div>
-          <p className="mt-4 text-[12.5px] text-ink-3">Answers are written on this Mac by the same local model that writes your summaries, from your transcripts only. Every claim is linked to the moment it came from.</p>
+          <p className="mt-4 text-[12.5px] text-ink-3">Answers are written on this Mac by the same local model that writes your summaries, from your own transcripts and summaries only. Every claim is linked to where it came from.</p>
         </div>
       )}
 
@@ -75,12 +75,12 @@ export function AskPanel({ active }: { active: boolean }) {
             </div>
           )}
 
-          {asked.reason === "no_matches" && <Note>Nothing in your transcripts matches that. Try the words you would actually have said out loud.</Note>}
+          {asked.reason === "no_matches" && <Note>Nothing in your transcripts or summaries matches that. Try the words you would actually have said out loud.</Note>}
           {asked.reason === "no_model" && <Note>No local model is available, so here are the moments themselves. Start Ollama, or pick the MLX model in <Link href="/settings/" className="underline">Settings</Link>, and the answer will be written for you.</Note>}
           {asked.reason === "model_error" && <Note><b className="text-clip">The model could not answer.</b> <span className="tc">{asked.error}</span> The matching moments are below.</Note>}
           {asked.reason === "empty_answer" && <Note>The model returned nothing. Here are the moments it was given.</Note>}
 
-          {!!asked.sources.length && <div className="eyebrow mt-2">{asked.answer ? "Sources" : "Moments that match"}</div>}
+          {!!asked.sources.length && <div className="eyebrow mt-2">{asked.answer ? "Sources" : asked.sources.every((s) => s.kind === "moment") ? "Moments that match" : "What matches"}</div>}
           {asked.sources.map((s) => <Source key={s.n} s={s} dim={!!asked.answer && !s.cited} />)}
 
           {asked.model && <p className="mt-1 text-[12px] text-ink-3">Written by <span className="tc">{asked.model.model}</span>, running on this Mac.</p>}
@@ -90,20 +90,26 @@ export function AskPanel({ active }: { active: boolean }) {
   );
 }
 
-/** One excerpt, numbered the way the answer cites it. Clicking opens the recording a second before the turn. */
+/** One excerpt, numbered the way the answer cites it. A moment opens the recording a second before the turn;
+ *  a summary block has no second to open, so it opens the Summary tab where it is written. */
 function Source({ s, dim }: { s: AskSource; dim: boolean }) {
+  const summary = s.kind === "summary";
   return (
     <Link
       id={`ask-source-${s.n}`}
-      href={`/?id=${s.recording_id}&t=${Math.max(0, s.start - 1).toFixed(1)}`}
+      href={summary ? `/?id=${s.recording_id}&tab=summary` : `/?id=${s.recording_id}&t=${Math.max(0, s.start - 1).toFixed(1)}`}
       style={speakerStyle(s.person_color)}
       className={`speaker rounded-lg border border-hairline bg-surface px-4 py-3 transition-colors hover:border-[var(--c)] ${dim ? "opacity-65" : ""}`}
     >
       <div className="flex flex-wrap items-center gap-x-3 text-[12px] text-ink-2">
         <span className={`tc grid size-5 shrink-0 place-items-center rounded-[5px] text-[11px] font-semibold ${dim ? "bg-surface-2 text-ink-3" : "bg-signal-soft text-signal"}`}>{s.n}</span>
-        <span className="inline-flex items-center gap-1.5 font-semibold text-[var(--c)]"><SpeakerDot color={s.person_color} />{s.speaker}</span>
+        {summary ? (
+          <span className="inline-flex items-center gap-1.5 font-semibold text-ink-2"><FileText className="size-3.5" />Summary{s.heading ? ` · ${s.heading}` : ""}</span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 font-semibold text-[var(--c)]"><SpeakerDot color={s.person_color} />{s.speaker}</span>
+        )}
         <span>{s.title}{s.recorded_at ? `, ${fmtDate(s.recorded_at)}` : ""}</span>
-        <span className="tc">{fmtTime(s.start)}</span>
+        {!summary && <span className="tc">{fmtTime(s.start)}</span>}
       </div>
       <div className="mt-1 text-[15px]"><Snippet s={s.snippet} /></div>
     </Link>
