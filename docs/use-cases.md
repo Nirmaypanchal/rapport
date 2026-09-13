@@ -13,8 +13,10 @@ Speakers are recognized across meetings, so "Speaker 2" becomes Priya once and s
 
 **Pain:** hours of interview audio on a recorder, transcription services that cost per minute and keep a copy.
 **With Rapport:** plug in the DJI Mic or Zoom recorder, walk away, come back to a speaker-labelled transcript. Search every
-interview you've ever done for a phrase and jump to the second it was said. Nothing leaves your machine, which matters
-for sources.
+interview you've ever done for a phrase and jump to the second it was said. Rapport never sends your recordings anywhere,
+which matters for sources — the one way words can leave is a cloud assistant you connect yourself through the
+[MCP server](integrations.md#mcp-server-your-recordings-inside-claude-cursor-or-any-mcp-client), and only what it reads.
+See [privacy](privacy.md).
 
 ## User research and customer calls
 

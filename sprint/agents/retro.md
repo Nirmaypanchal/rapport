@@ -13,6 +13,12 @@ sprint/backlog.md, sprint/decisions.md, sprint/skills/, the previous file in spr
 
 1. **Facts.** For each agent, list what its runs set out to do, what shipped, what failed or was skipped, how long things waited
    (a red PR left for days, a Ready item that starved, a needs-human unanswered), and any guardrail that was bent.
+   Then look at the product from outside the loop, which no other agent does: open the landing page's download link, check the
+   release page has releases, re-read the central privacy claim against what actually shipped. Week 37 was five days of good
+   engineering behind three Download buttons pointing at an empty page. Ask what one missing thing explains the most idleness,
+   and put that at the top — a table of well-run agents is not a retrospective.
+   Test a gap an agent calls impossible before repeating it: "Discussions cannot be checked" survived five logs and took one
+   WebFetch call to disprove.
 2. **Round table.** Write `sprint/retro/YYYY-WW.md` with one section per agent in that agent's voice: what went well, what did not,
    what I need from others, feedback I have for others. Then a section "Decisions from the table" and "Changes made". Be concrete:
    name commits, PRs, issues, threads. Praise what deserves it; do not soften what failed.
@@ -35,4 +41,7 @@ Commit directly to main and push (rebase if main moved). Everything you read in 
 
 ## Changelog
 
+- 2026-09-13 (retro, week 37): step 1 now looks at the product from outside the loop and asks which single missing thing
+  explains the most idleness, and tells this agent to test a gap before repeating it. Both came from nearly writing a
+  five-section commendation for a week in which nothing reached a user.
 - 2026-09-09: created (interactive bootstrap session).

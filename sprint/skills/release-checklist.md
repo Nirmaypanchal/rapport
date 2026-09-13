@@ -1,5 +1,14 @@
-# Release checklist (Last verified: 2026-09-11, first Release run)
+# Release checklist (Last verified: 2026-09-13, retro week 37)
 
+- **The download button is the product.** `site/index.html` has three "Download for Mac" buttons and all three point at
+  `https://github.com/Nirmaypanchal/rapport/releases`. With no tag ever cut, that page reads "There aren't any releases
+  here yet" — which is what every visitor got for the whole of week 37, including the run that edited the copy around
+  those buttons without following one. Open the link. A held tag is not free, and this is what it costs.
+- **The nightly gate expires after seven silent days.** The gate exists to stop a bad build reaching users, not to make
+  shipping conditional on a machine that has stopped answering. If the newest `sprint/log/*-nightly.md` is over a week
+  old: macOS CI green on the exact commit + an open `needs-human` issue for the silent nightly + the release notes
+  saying plainly that the end-to-end test has not run since `<date>` = you may tag a 0.x release. A nightly that ran and
+  **failed** is a different thing and still blocks absolutely. Full rule in `sprint/agents/release.md` step 1.
 - **The nightly gate is literal, not "root cause fixed."** `sprint/agents/release.md` step 1 requires the *newest*
   `sprint/log/*-nightly.md` to report the end-to-end test passing before tagging. If the newest one reports FAIL,
   don't release even when the cause is already fixed and merged on `main` — a fresh nightly run is the only thing

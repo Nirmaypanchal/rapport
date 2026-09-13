@@ -2,6 +2,21 @@
 
 Newest first. One paragraph each: what, why, what it rules out.
 
+- **2026-09-13 · The nightly release gate expires after seven silent days.** Release still may not ship on a nightly that
+  ran and failed — that part is absolute. But when the newest `sprint/log/*-nightly.md` is more than a week old, the machine
+  is not reporting rather than failing, and a gate with no timeout is a gate that can close forever: week 37 ended with three
+  user-visible features unreleased, no tag ever cut, and the landing page's three Download buttons pointing at an empty
+  `/releases` page. From now on Release may tag a 0.x release in that case if macOS CI is green on the exact commit, an open
+  `needs-human` issue already tracks the silent nightly, and the changelog and GitHub Release body say plainly that the
+  on-device end-to-end test has not run since a named date. Reason: shipping unverified and saying so is honest; never
+  shipping is not a safety property. Ruled out: using this to route around a red nightly, and using it above 0.x.
+- **2026-09-13 · A weekly agent may not own a daily unblock.** Research now leaves seven unblocked Ready items rather than
+  three (Build takes one a day and Research runs weekly — three days of work is starvation by Saturday, which is what
+  happened), Build falls through to the first specified item in Next rather than starving on a blocked Now, and an agent
+  that can prove an escalation is resolved closes it with the evidence instead of queueing a note for Research. Issue #2
+  was resolved in fact on 2026-09-10 and sat open four days while three runs pointed at it. Ruled out: an agent closing an
+  escalation it cannot verify — that stays the owner's, untouched. The Escalation section of AGENTS.md is unchanged; it
+  assigns the file move to Research and describes the owner closing issues, and does not say the owner is the only one who may.
 - **2026-09-11 · The MCP server is hand-written, not an SDK.** `rapport/mcp.py` implements the protocol's stdio transport
   (JSON-RPC 2.0, one message per line) in the standard library: `initialize`, `tools/list`, `tools/call` and
   notifications is the whole surface a read-only tool server needs, about 90 lines. Reason: the frozen backend is already
