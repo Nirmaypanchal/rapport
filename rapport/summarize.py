@@ -12,6 +12,7 @@ the rules that hold whatever the recording is. Users can also write their own pr
 from __future__ import annotations
 
 import json
+import re
 import threading
 import urllib.error
 import urllib.request
@@ -63,6 +64,86 @@ def _parse_template(tid: str, text: str) -> Template:
     except ValueError:
         order = 100
     return Template(id=tid, name=meta.get("name") or tid, description=meta.get("description", ""), prompt=body.strip(), order=order)
+
+
+# ---- the shape of a written summary --------------------------------------------------------------------
+#
+# A summary has no timestamps, so the smallest citable piece of one is the block it is written in: a bullet
+# ("- We settled on forty euros a seat") or a paragraph. `split_summary` cuts a summary into those blocks and
+# keeps the heading above each one, which is what makes a block readable on its own once it is lifted out of
+# its summary. `db.index_summary` stores the result so the blocks can be searched and cited like a moment.
+
+MAX_BLOCK_CHARS = 1000  # a block longer than this is cut on sentence ends, so one blob cannot fill a prompt
+
+_HEADING = re.compile(r"^\s{0,3}#{1,6}\s+(.*?)\s*#*\s*$")
+_BULLET = re.compile(r"^(\s*)(?:[-*+]|\d{1,3}[.)])\s+(.*)$")
+_SENTENCE_END = re.compile(r"(?<=[.!?;:])\s+")
+_BOLD_LABEL = re.compile(r"^\*{2}(.+?)\*{2}:?\s*$")
+
+
+def _cut(text: str, limit: int = MAX_BLOCK_CHARS) -> list[str]:
+    """One block, cut on sentence ends if it is too long. A single sentence over the limit is kept whole."""
+    if len(text) <= limit:
+        return [text]
+    out: list[str] = []
+    current = ""
+    for piece in _SENTENCE_END.split(text):
+        if current and len(current) + 1 + len(piece) > limit:
+            out.append(current)
+            current = piece
+        else:
+            current = f"{current} {piece}".strip()
+    if current:
+        out.append(current)
+    return out
+
+
+def _dedent(line: str, base: int) -> str:
+    """A continuation line without the indentation its block already carries."""
+    return line[base:] if base and not line[:base].strip() else line.strip()
+
+
+def split_summary(summary: str | None) -> list[tuple[str | None, str]]:
+    """A summary as `(heading, block)` pairs, in the order it is written.
+
+    A block is one list item (with whatever is indented under it) or one paragraph. Headings — `## Decisions`
+    and the `**Decisions**` a small model often writes instead — are not blocks of their own: they label the
+    blocks below them, so a block can be shown and cited without its summary around it.
+    """
+    heading: str | None = None
+    out: list[tuple[str | None, str]] = []
+    block: list[str] = []
+    indent = 0
+
+    def flush() -> None:
+        nonlocal block
+        text = "\n".join(line.rstrip() for line in block).strip()
+        if text:
+            out.extend((heading, piece) for piece in _cut(text))
+        block = []
+
+    for raw in (summary or "").splitlines():
+        line = raw.rstrip()
+        if not line.strip():
+            flush()
+            continue
+        title = _HEADING.match(line) or (_BOLD_LABEL.match(line.strip()) if not block else None)
+        if title:
+            flush()
+            heading = title.group(1).strip() or None
+            continue
+        bullet = _BULLET.match(line)
+        if bullet and (not block or len(bullet.group(1)) <= indent):
+            flush()  # a sibling item, or the first of a list: a block of its own
+            indent = len(bullet.group(1))
+            block.append(bullet.group(2))
+        elif block:  # anything else while a block is open belongs to it: a wrapped line, a sub-bullet
+            block.append(_dedent(line, indent))
+        else:
+            indent = len(line) - len(line.lstrip())
+            block.append(line.strip())
+    flush()
+    return out
 
 
 _templates_cache: list[Template] | None = None

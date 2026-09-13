@@ -15,6 +15,7 @@ export function RecordingsView() {
   const router = useRouter();
   const id = params.get("id") ? Number(params.get("id")) : null;
   const t = params.get("t") ? Number(params.get("t")) : undefined;
+  const openTab = params.get("tab") || undefined;   // a cited summary links straight to the Summary tab
   const { data: status } = useStatus();
   const busy = !!(status?.worker.current || status?.importer.importing);
   const { data: recordings, mutate } = useSWR<Recording[]>("/api/recordings", fetcher, { refreshInterval: busy ? 3000 : 15000 });
@@ -54,7 +55,7 @@ export function RecordingsView() {
         <RecordingList recordings={recordings ?? []} activeId={id} />
       </aside>
       <section className={cn("min-h-0", id == null && "hidden lg:block")}>
-        {id != null ? <RecordingDetail id={id} seekTo={t} onListChanged={() => mutate()} /> : <div className="hidden h-full place-items-center text-[13px] text-ink-3 lg:grid">Select a recording.</div>}
+        {id != null ? <RecordingDetail id={id} seekTo={t} openTab={openTab} onListChanged={() => mutate()} /> :<div className="hidden h-full place-items-center text-[13px] text-ink-3 lg:grid">Select a recording.</div>}
       </section>
     </div>
   );

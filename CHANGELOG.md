@@ -10,6 +10,11 @@ All notable changes to Rapport. The format follows Keep a Changelog; versions fo
   retrieval picks the moments, the local model writes a few sentences and cites each one, and every citation jumps to
   the excerpt and opens the recording where the words were said. With no local model installed you still get the
   moments that match. `POST /api/ask`.
+- **Ask reads your summaries too.** What a meeting decided is usually written in its summary in one sentence, and
+  often in words nobody said out loud — so summaries are now in the search index as well, block by block. Ask leads
+  with up to three of them (one per recording) and fills the rest with the moments; a cited summary opens that
+  recording's Summary tab, since a summary has no second to jump to. The MCP `search` tool returns them too, marked
+  `kind: "summary"`. Summaries already in your library are indexed the next time Rapport opens it.
 - **MCP server.** Claude, Cursor and any other MCP client can now search your recordings and read transcripts,
   summaries and people, on your Mac, with no key and no network: `rapport-core --mcp`, or
   `uv run python -m rapport.mcp` from a checkout. Six read-only tools — `search`, `list_recordings`,

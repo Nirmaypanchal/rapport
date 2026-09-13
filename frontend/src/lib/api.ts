@@ -172,14 +172,18 @@ export type SearchHit = {
 };
 
 /** One moment behind an answer: the turn that matched, with the turns around it. `n` is the number the answer cites. */
+/** One piece of evidence behind an answer: a `moment` that was said, or a block of a written `summary`.
+ *  A summary has no timestamp, so `segment_id` is null and `start` is 0 — it opens on the Summary tab. */
 export type AskSource = {
   n: number;
+  kind: "moment" | "summary";
   recording_id: number;
-  segment_id: number;
+  segment_id: number | null;
   start: number;
   end: number;
   speaker: string;
   person_color: string | null;
+  heading: string | null;
   text: string;
   snippet: string;
   title: string;

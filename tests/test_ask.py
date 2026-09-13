@@ -1,7 +1,7 @@
 """Retrieval assembly for "Ask your library". No model runs here: everything up to the prompt is plain Python."""
 import pytest
 
-from rapport.ask import ask, build_user, cited, clock, keywords, passages, pick_hits
+from rapport.ask import ask, build_user, cited, clock, keywords, passages, pick_hits, retrieve
 
 
 # ---- the question -> search terms ----------------------------------------
@@ -162,3 +162,70 @@ def test_ask_reports_an_empty_answer(db, library_with_talk, monkeypatch):
 def test_search_match_any_vs_all(db, library_with_talk):
     assert db.search("pricing helicopter") == [], "every term must match by default"
     assert db.search("pricing helicopter", match="any"), "a question only needs some of its words"
+
+
+# ---- summaries as evidence ------------------------------------------------
+
+@pytest.fixture
+def library_with_a_summary(db, library_with_talk):
+    db.update_recording(library_with_talk, summary_status="done", summary=(
+        "## Decisions\n"
+        "- Pricing is forty euros a seat, agreed with Maya.\n"
+        "- The launch holds on the fourth of October.\n"
+    ))
+    return library_with_talk
+
+
+def test_retrieve_leads_with_the_summary_then_the_moments(db, library_with_a_summary):
+    found = retrieve(db, keywords("What did we decide about the pricing?"))
+    assert [p.kind for p in found] == ["summary", "moment"]
+    block, moment = found
+    assert block.text == "Pricing is forty euros a seat, agreed with Maya." and block.heading == "Decisions"
+    assert block.segment_id is None and block.start == 0.0, "a summary has no second to jump to"
+    assert block.title == "Monday standup" and block.recorded_at.startswith("2026-09-07")
+    assert moment.segment_id is not None and moment.start == 4, "the moment it came from is still there"
+
+
+def test_retrieve_answers_from_the_summary_when_no_turn_says_it(db, library_with_talk):
+    """The point of indexing summaries: the words "decided" and "agreed" are in the summary, not the transcript."""
+    assert retrieve(db, keywords("What was agreed?")) == []
+    db.update_recording(library_with_talk, summary="- It was agreed that Maya signs the contract.")
+    found = retrieve(db, keywords("What was agreed?"))
+    assert [p.kind for p in found] == ["summary"] and "Maya signs" in found[0].text
+
+
+def test_retrieve_caps_summaries_at_one_per_recording_and_leaves_room_for_moments(db):
+    for n in range(5):
+        rid = db.insert_recording(sha256=f"{n}c" * 32, original_name=f"{n}.wav", rel_path=f"a/{n}.wav",
+                                  status="done", title=f"Meeting {n}")
+        db.replace_segments(rid, [{"speaker": "SPEAKER_00", "start": 0, "end": 3, "text": "the budget came up again"}])
+        db.update_recording(rid, summary="- The budget is approved.\n- The budget is tight.")
+    found = retrieve(db, ["budget"])
+    kinds = [p.kind for p in found]
+    assert kinds == ["summary"] * 3 + ["moment"] * 5, "three summaries at most, and they never crowd out the moments"
+    assert len({p.recording_id for p in found if p.kind == "summary"}) == 3, "one summary per recording spreads them"
+    assert len(found) <= 8
+
+
+def test_retrieve_without_summaries_is_what_it_always_was(db, library_with_talk):
+    found = retrieve(db, keywords("What did we decide about the pricing?"))
+    assert [p.kind for p in found] == ["moment"]
+    assert retrieve(db, []) == []
+    assert retrieve(db, ["pricing"], max_summaries=0) == retrieve(db, ["pricing"])
+
+
+def test_build_user_says_which_excerpts_are_summaries(db, library_with_a_summary):
+    user = build_user("What did we decide?", retrieve(db, keywords("What did we decide about pricing?")))
+    assert '[1] Summary of "Monday standup", 2026-09-07, under "Decisions"' in user
+    assert "[2] Monday standup, 2026-09-07, at 00:04" in user
+
+
+def test_ask_cites_a_summary_like_any_other_source(db, library_with_a_summary, monkeypatch):
+    monkeypatch.setattr("rapport.ask.chat", lambda *a, **k: "Forty euros a seat [1].")
+    monkeypatch.setattr("rapport.ask.resolve_provider", lambda *a, **k: ("ollama", "llama3"))
+    out = ask(db, "What did we decide about pricing?")
+    top = out["sources"][0]
+    assert top["kind"] == "summary" and top["cited"] is True and top["n"] == 1
+    assert top["segment_id"] is None and top["heading"] == "Decisions" and top["speaker"] == ""
+    assert "[[euros]]" in top["snippet"] or "euros" in top["snippet"]
+    assert [s["cited"] for s in out["sources"]] == [True] + [False] * (len(out["sources"]) - 1)

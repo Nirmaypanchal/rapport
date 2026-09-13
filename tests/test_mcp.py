@@ -140,11 +140,22 @@ def test_search_returns_excerpts_with_context(library_with_two_recordings):
 
 def test_search_match_modes_and_no_matches(library_with_two_recordings):
     db = library_with_two_recordings["db"]
-    assert _call(db, "search", {"query": "marathon submarine", "match": "any"})["count"] == 1
+    any_hits = _call(db, "search", {"query": "marathon submarine", "match": "any"})
+    assert [r["kind"] for r in any_hits["results"]] == ["summary", "moment"], "the summary says it in one line"
     assert _call(db, "search", {"query": "marathon submarine", "match": "all"})["count"] == 0
 
     empty = _call(db, "search", {"query": "submarine"})
     assert empty["count"] == 0 and empty["results"] == [] and empty["note"]
+
+
+def test_search_returns_summary_blocks_without_a_timestamp(library_with_two_recordings):
+    """A summary is not a moment: it has no second to jump to, and `get_summary` reads the rest of it."""
+    out = _call(library_with_two_recordings["db"], "search", {"query": "What did we decide about the marathon?"})
+    block = out["results"][0]
+    assert block["kind"] == "summary" and block["heading"] == "Decisions"
+    assert block["excerpt"] == "Run the marathon in October."
+    assert block["recording_id"] == library_with_two_recordings["done"] and block["title"] == "Marathon planning"
+    assert "at" not in block and "start_sec" not in block and "speaker" not in block
 
 
 def test_search_rejects_bad_arguments(db):
@@ -155,7 +166,7 @@ def test_search_rejects_bad_arguments(db):
 
 
 def test_search_limit_is_clamped_not_refused(library_with_two_recordings):
-    assert _call(library_with_two_recordings["db"], "search", {"query": "marathon", "limit": 9999})["count"] == 1
+    assert _call(library_with_two_recordings["db"], "search", {"query": "marathon", "limit": 9999})["count"] == 2
 
 
 def test_list_recordings_filters(library_with_two_recordings):

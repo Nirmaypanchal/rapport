@@ -65,10 +65,12 @@ TOOLS: list[dict] = [
     {
         "name": "search",
         "description": (
-            "Search the user's own recordings and find the moments that match. Takes a question or a few words "
-            "and returns the matching turns with the turn before and after each one, so every result is readable "
-            "on its own. Each result carries the recording id and the timestamp, which `get_transcript` can "
-            "widen. Start here: it is the only tool that finds a recording id from words."
+            "Search the user's own recordings and find what matches. Takes a question or a few words and "
+            "returns two kinds of result, each readable on its own: a `moment` is what was said — the matching "
+            "turn with the turn before and after it, carrying a timestamp `get_transcript` can widen — and a "
+            "`summary` is a block of the summary Rapport wrote for a recording, which often states an outcome "
+            "the transcript only arrives at slowly; `get_summary` reads the rest of one. Both carry the "
+            "recording id. Start here: it is the only tool that finds a recording id from words."
         ),
         "inputSchema": {
             "type": "object",
@@ -218,14 +220,22 @@ def tool_search(db, args: dict) -> dict:
         raise ToolError("match must be 'any' or 'all'")
 
     terms = ask.keywords(query)
-    hits = db.search(" ".join(terms), limit=ask.SEARCH_LIMIT, match=match) if terms else []
-    found = ask.passages(db, ask.pick_hits(hits, max_passages=limit))
-    return {
-        "query": query,
-        "searched_for": terms,
-        "count": len(found),
-        "results": [
-            {
+    found = ask.retrieve(db, terms, match=match, max_passages=limit)
+    results = []
+    for p in found:
+        if p.kind == "summary":
+            # A summary has no timestamp: `get_summary` is where to read the rest of it, not `get_transcript`.
+            results.append({
+                "kind": "summary",
+                "recording_id": p.recording_id,
+                "title": p.title,
+                "recorded_at": p.recorded_at,
+                "heading": p.heading,
+                "excerpt": p.text,
+            })
+        else:
+            results.append({
+                "kind": "moment",
                 "recording_id": p.recording_id,
                 "title": p.title,
                 "recorded_at": p.recorded_at,
@@ -233,10 +243,13 @@ def tool_search(db, args: dict) -> dict:
                 "start_sec": round(p.start, 1),
                 "speaker": p.speaker,
                 "excerpt": p.text,
-            }
-            for p in found
-        ],
-        "note": None if found else "Nothing in the library matches those words.",
+            })
+    return {
+        "query": query,
+        "searched_for": terms,
+        "count": len(results),
+        "results": results,
+        "note": None if results else "Nothing in the library matches those words.",
     }
 
 

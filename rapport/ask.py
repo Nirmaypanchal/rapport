@@ -4,6 +4,11 @@ Retrieval is the same SQLite full-text index the Search page uses. The excerpts 
 source material: the local model (Ollama or MLX — the one that writes summaries) turns them into a few sentences
 and cites them by number. Nothing is sent anywhere.
 
+Two kinds of excerpt go in. A **moment** is what was said: the turn that matched and the turn on each side. A
+**summary** excerpt is a block of the summary Rapport already wrote for a recording — what a meeting decided is
+usually stated there in one sentence, where the transcript spends five minutes arriving at it. Summaries are the
+shorter, denser evidence, so a few of them lead; the moments they came from fill the rest.
+
 When no local model is available the excerpts are returned on their own, which is already an answer of sorts;
 nothing is ever invented to fill the gap.
 """
@@ -17,11 +22,15 @@ from .summarize import chat, resolve_provider
 SEARCH_LIMIT = 60      # FTS hits considered before they are thinned into excerpts
 MAX_PASSAGES = 8       # excerpts shown, and given to the model
 PER_RECORDING = 2      # at most this many from one recording, so a long meeting cannot crowd out the rest
+SUMMARY_PASSAGES = 3   # of those excerpts, at most this many from written summaries, one per recording
 CONTEXT_SEGMENTS = 1   # turns kept on each side of a hit
 MAX_KEYWORDS = 12
 
 SYSTEM = (
     "You answer questions about someone's own audio recordings, using only the numbered excerpts you are given. "
+    "An excerpt headed \"Summary of\" is the summary Rapport wrote of that recording, not words anyone said; the "
+    "others are what was said, at the time given. Use both, and say \"the summary says\" when only a summary "
+    "supports a claim. "
     "Answer in the language of the question. Cite the excerpts you used as [1], [2] and so on, right after the "
     "sentence they support. Never invent a fact, a name, a number or a date, and never use knowledge from outside "
     "the excerpts. If the excerpts do not answer the question, say so in one sentence and say what they do cover. "
@@ -57,10 +66,16 @@ def keywords(question: str, limit: int = MAX_KEYWORDS) -> list[str]:
 
 @dataclass(frozen=True)
 class Passage:
-    """One moment in one recording: the turn that matched, plus the turns around it."""
+    """One piece of evidence from one recording.
+
+    `kind="moment"`: the turn that matched plus the turns around it, at `start` in the audio.
+    `kind="summary"`: one block of the summary written for that recording, under `heading` if it has one. A
+    summary has no timestamps, so `segment_id` is None and `start` stays 0 — the place to open is the summary
+    itself, not a second of audio.
+    """
 
     recording_id: int
-    segment_id: int
+    segment_id: int | None
     start: float
     end: float
     speaker: str
@@ -69,12 +84,14 @@ class Passage:
     snippet: str
     title: str
     recorded_at: str | None
+    kind: str = "moment"
+    heading: str | None = None
 
     def to_json(self, n: int) -> dict:
         return {
-            "n": n, "recording_id": self.recording_id, "segment_id": self.segment_id,
+            "n": n, "kind": self.kind, "recording_id": self.recording_id, "segment_id": self.segment_id,
             "start": self.start, "end": self.end,
-            "speaker": self.speaker, "person_color": self.speaker_color,
+            "speaker": self.speaker, "person_color": self.speaker_color, "heading": self.heading,
             "text": self.text, "snippet": self.snippet, "title": self.title, "recorded_at": self.recorded_at,
             "cited": True,
         }
@@ -125,6 +142,51 @@ def passages(db, hits: list[dict], context: int = CONTEXT_SEGMENTS) -> list[Pass
     return out
 
 
+def summary_passages(hits: list[dict]) -> list[Passage]:
+    """Turn summary-block hits into excerpts. The block is already a whole thought, so it needs no context."""
+    return [
+        Passage(
+            recording_id=h["recording_id"],
+            segment_id=None,
+            start=0.0,
+            end=0.0,
+            speaker="",
+            speaker_color=None,
+            text=h.get("text") or "",
+            snippet=h.get("snippet") or "",
+            title=h.get("title") or h.get("original_name") or "Recording",
+            recorded_at=h.get("recorded_at"),
+            kind="summary",
+            heading=h.get("heading"),
+        )
+        for h in hits
+    ]
+
+
+def retrieve(
+    db, terms: list[str], limit: int = SEARCH_LIMIT, match: str = "any",
+    max_passages: int = MAX_PASSAGES, max_summaries: int = SUMMARY_PASSAGES,
+) -> list[Passage]:
+    """The excerpts to answer from: a few summary blocks first, then the moments, best first.
+
+    The two indexes are ranked separately — bm25 over one-line turns and bm25 over summary blocks are not the
+    same scale — so each gets its own budget instead of one merged order. Summaries are capped at one per
+    recording, which spreads them over meetings; the moments keep their own two-per-recording cap.
+    """
+    if not terms:
+        return []
+    query = " ".join(terms)
+    room_for_summaries = min(max(max_summaries, 0), max_passages)
+    found = summary_passages(pick_hits(
+        db.search_summaries(query, limit=limit, match=match),
+        max_passages=room_for_summaries, per_recording=1,
+    )) if room_for_summaries else []
+    room = max_passages - len(found)
+    if room > 0:
+        found += passages(db, pick_hits(db.search(query, limit=limit, match=match), max_passages=room))
+    return found
+
+
 def clock(seconds: float) -> str:
     s = max(0, int(seconds))
     h, rest = divmod(s, 3600)
@@ -137,7 +199,11 @@ def build_user(question: str, found: list[Passage]) -> str:
     blocks = []
     for i, p in enumerate(found, 1):
         when = f", {p.recorded_at[:10]}" if p.recorded_at else ""
-        blocks.append(f"[{i}] {p.title}{when}, at {clock(p.start)}\n{p.text}")
+        if p.kind == "summary":
+            under = f", under \"{p.heading}\"" if p.heading else ""
+            blocks.append(f"[{i}] Summary of \"{p.title}\"{when}{under}\n{p.text}")
+        else:
+            blocks.append(f"[{i}] {p.title}{when}, at {clock(p.start)}\n{p.text}")
     return f"Question: {question}\n\nExcerpts:\n\n" + "\n\n".join(blocks)
 
 
@@ -155,9 +221,7 @@ def ask(db, question: str, provider: str = "auto", model: str | None = None, lim
     q = (question or "").strip()
     if not q:
         raise ValueError("ask a question")
-    terms = keywords(q)
-    hits = db.search(" ".join(terms), limit=limit, match="any") if terms else []
-    found = passages(db, pick_hits(hits))
+    found = retrieve(db, keywords(q), limit=limit)
     out: dict = {
         "question": q,
         "answer": None,

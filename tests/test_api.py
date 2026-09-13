@@ -72,11 +72,25 @@ def test_ask_returns_sources_without_a_model(library, db):
 
     body = c.post("/api/ask", json={"q": "When is the deadline?"}).json()
     assert body["answer"] is None and body["reason"] == "no_model"
+    assert body["sources"][0]["kind"] == "moment"
     assert body["sources"][0]["recording_id"] == rid and body["sources"][0]["start"] == 12
     assert "deadline" in body["sources"][0]["snippet"]
 
     assert c.post("/api/ask", json={"q": "  "}).status_code == 400
     assert c.post("/api/ask", json={"q": "nothing like this word exists"}).json()["reason"] == "no_matches"
+
+
+def test_ask_can_answer_from_a_summary(library, db):
+    """The shape the Ask panel reads for a cited summary: no segment, no timestamp, a heading to show."""
+    rid = db.insert_recording(sha256="5" * 64, original_name="b.wav", rel_path="audio/b.wav", status="done", title="Kickoff")
+    db.replace_segments(rid, [{"speaker": "SPEAKER_00", "start": 12, "end": 15, "text": "so March then, probably"}])
+    db.update_recording(rid, summary="## Decisions\n- The deadline is the first of March.", summary_status="done")
+
+    body = _client(library, db).post("/api/ask", json={"q": "What is the deadline?"}).json()
+    top = body["sources"][0]
+    assert top["kind"] == "summary" and top["segment_id"] is None and top["start"] == 0
+    assert top["heading"] == "Decisions" and top["recording_id"] == rid
+    assert "deadline" in top["snippet"]
 
 
 def test_summary_templates_listed(library, db):

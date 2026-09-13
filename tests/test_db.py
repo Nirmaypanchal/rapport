@@ -63,3 +63,70 @@ def test_count_segments_matches_the_segments(db):
     ])
     assert db.count_segments(rid) == len(db.get_segments(rid)) == 2
     assert db.count_segments(rid + 999) == 0
+
+
+# ---- summaries in the search index ----------------------------------------
+
+def _summarized(db, text, name="talk.wav", sha="e" * 64, title="Pricing sync"):
+    rid = db.insert_recording(sha256=sha, original_name=name, rel_path=f"audio/{name}", status="done", title=title)
+    db.update_recording(rid, summary=text, summary_status="done")
+    return rid
+
+
+def test_writing_a_summary_indexes_its_blocks(db):
+    rid = _summarized(db, "## Decisions\n- Forty euros a seat.\n- Launch on the fourth.")
+    assert [c["text"] for c in db.summary_chunks(rid)] == ["Forty euros a seat.", "Launch on the fourth."]
+    assert [c["heading"] for c in db.summary_chunks(rid)] == ["Decisions", "Decisions"]
+
+    hit = db.search_summaries("euros")[0]
+    assert hit["recording_id"] == rid and hit["title"] == "Pricing sync" and hit["heading"] == "Decisions"
+    assert "[[euros]]" in hit["snippet"], "the matching words are marked like any other search hit"
+
+
+def test_a_rewritten_summary_replaces_what_was_indexed(db):
+    """Regenerating a summary must not leave the old one findable — it is no longer in the library."""
+    rid = _summarized(db, "- The launch slips to November.")
+    db.update_recording(rid, summary="- The launch holds in October.")
+    assert db.search_summaries("November") == []
+    assert len(db.search_summaries("October")) == 1
+    assert len(db.summary_chunks(rid)) == 1, "the old blocks are gone, not merely unfindable"
+
+
+def test_clearing_a_summary_clears_its_blocks(db):
+    rid = _summarized(db, "- Something was decided.")
+    db.update_recording(rid, summary=None)
+    assert db.summary_chunks(rid) == [] and db.search_summaries("decided") == []
+
+
+def test_a_summary_that_arrives_with_the_recording_is_indexed(db):
+    """Granola, Omi and Notion notes come in already summarized, through insert_recording."""
+    rid = db.insert_recording(sha256="f" * 64, original_name="note.txt", rel_path="a/note.txt", status="done",
+                              source="granola", summary="- Agreed to ship on Tuesday.")
+    assert db.search_summaries("Tuesday")[0]["recording_id"] == rid
+
+
+def test_summaries_written_before_the_index_existed_are_backfilled(db, library):
+    """An existing library gets its summaries indexed the next time Rapport opens it."""
+    from rapport.db import Database
+
+    rid = _summarized(db, "- The pastel notebooks are ordered.")
+    db.connect().execute("DELETE FROM summary_chunks")  # as if written by a version without the index
+    db.connect().commit()
+    assert db.search_summaries("notebooks") == []
+
+    reopened = Database(library.db_path)
+    assert reopened.search_summaries("notebooks")[0]["recording_id"] == rid
+    assert reopened._index_unindexed_summaries() == 0, "a second open has nothing left to do"
+
+
+def test_deleting_a_recording_takes_its_summary_out_of_the_index(db):
+    rid = _summarized(db, "- Forty euros a seat.")
+    db.delete_recording(rid)
+    assert db.search_summaries("euros") == [] and db.summary_chunks(rid) == []
+
+
+def test_summary_search_match_modes(db):
+    _summarized(db, "- Forty euros a seat, agreed with Maya.")
+    assert db.search_summaries("euros helicopter") == [], "every term must match by default"
+    assert len(db.search_summaries("euros helicopter", match="any")) == 1
+    assert db.search_summaries("") == [] and db.search_summaries("?") == []
