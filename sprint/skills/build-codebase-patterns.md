@@ -18,6 +18,18 @@ Read before writing code. These are things the codebase already decided; followi
   error there. A token that tokenizes to nothing (`"?"`) is also an error, so strip non-word tokens before you get
   that far. Terms joined by a space are AND; joined by ` OR ` they are OR (`db.search(..., match="any")`).
 - **Routes stay a few lines**: validate, call a module, return. Heavy imports go inside the function body.
+- **A second thing to search is a second FTS table, not a column.** `segments_fts` is external-content
+  (`content='segments'`), so "which kind of thing is this hit" cannot live on it — summaries got their own
+  `summary_chunks` table plus `summary_chunks_fts` and the same three triggers (`_ai`/`_au`/`_ad`). Copy that block
+  verbatim; the delete trigger is the one people forget, and without it a deleted row stays findable forever.
+- **Two bm25 rankings are not one ranking.** Scores over one-line turns and over summary blocks are not on the same
+  scale, so merging them by score is a guess dressed up as a number. Give each index a budget instead and say why in
+  the docstring (`ask.retrieve`: three summaries at most, one per recording, then moments fill the rest).
+- **When a trigger cannot do the work, use the choke point instead of the callers.** Splitting Markdown into rows
+  needs Python, so `db.index_summary()` is called from `insert_recording` and `update_recording` — the two functions
+  every writer already goes through — rather than from the pipeline and the importer separately. Then add a backfill
+  in `Database.__init__` (`WHERE … AND id NOT IN (SELECT recording_id FROM …)`) for rows written before the index
+  existed: it costs one query that returns nothing on an indexed library, and it self-heals if anything ever drifts.
 
 ## A second way in (MCP, and anything else that is not HTTP)
 
@@ -87,6 +99,9 @@ Read before writing code. These are things the codebase already decided; followi
   `assert "--search" not in WORKFLOW.read_text()`.
 - Job logs are readable long after the fact and are the fastest way to find out what a workflow actually did —
   list the run's jobs, then read the job's log. That is how the #3/#6 cause was pinned down rather than guessed.
+- **Do not trust `merged` from the pull request *list* API.** On 2026-09-13 it reported `merged: false` for #13,
+  which `sprint-merge` had squash-merged a minute earlier; reading the pull request itself showed `merged: true` with
+  a `merged_at`. Check the single-PR read, or just look for the commit on `main`.
 
 ## Packaging
 
