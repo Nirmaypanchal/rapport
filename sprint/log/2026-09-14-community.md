@@ -27,29 +27,35 @@ sprint/skills/all-sprint-automation.md, sprint/backlog.md.
   (09-09 was a Tuesday), and `state.json`'s `last_update_post` was still `null`, so the weekly "This week in
   Rapport" update was due for the first time.
 
-**Found:** nothing new from users this run.
+**Found:** nothing new from users this run — but a real bug in our own pipeline, below.
 
-**Filed:** nothing. No bug or feature request reached this run.
+**Filed:** [#16](https://github.com/Nirmaypanchal/rapport/issues/16) — `scripts/reddit_post.py`'s subreddit check
+uses `.lstrip("r/")`, which strips leading `r`/`/` *characters*, not the literal prefix. `"rapport"` itself becomes
+`"apport"` and fails its own allow-list, so **no post can ever reach r/rapport, with or without credentials.** Found
+by actually watching this run's own post fail (see Posted, below), not from a user report. A second, adjacent
+parsing bug in the same function is noted in the issue too (a frontmatter value starting with a lowercase `t` gets
+truncated to one word). Added to `sprint/backlog.md` under Now as a small, high-priority fix — it blocks every
+future post regardless of what else ships.
 
 **Answered:** nothing. No question reached this run.
 
-**Posted:** the first weekly update, `sprint/reddit/outbox/2026-09-14-weekly-update.md` — what shipped this week
-(Ask, Ask reading summaries, the MCP server, the per-source summary template, all still Unreleased in
+**Posted (attempted):** the first weekly update, `sprint/reddit/outbox/2026-09-14-weekly-update.md` — what shipped
+this week (Ask, Ask reading summaries, the MCP server, the per-source summary template, all still Unreleased in
 `CHANGELOG.md`), what's next (MCP write-back, Search finding summaries, sprint housekeeping), and one question for
-the community. Committed to `main` so the `reddit-post` workflow picks it up; the Reddit bot credentials are still
-missing (#3), so the realistic outcome is the file landing in `sprint/reddit/failed/` with that error — which would
-just confirm the known, already-escalated block rather than reveal anything new. Updated
-`sprint/reddit/state.json`'s `last_update_post` to `2026-09-14` so next Monday composes fresh content instead of
-re-checking whether this one is "due."
+the community. Committed to `main`; the `reddit-post` workflow ran and moved it to `sprint/reddit/failed/` — **not**
+for the missing-credentials reason predicted above, but for the `lstrip` bug (#16): `error: subreddit 'apport' is
+not allowed; only ['rapport']`. Left in `failed/` as evidence for Build's fix rather than resubmitted by hand.
+Updated `sprint/reddit/state.json`'s `last_update_post` to `2026-09-14` regardless, since the content itself was
+composed and reflects this week accurately — the failure is the pipeline's, not the update's.
 
-**Escalations:** none new. All four `sprint/needs-human/` files remain open, genuinely unresolved, and unchanged
-this run — no duplicate created, no email sent.
+**Escalations:** none new via `needs-human/` — this is a code bug with a clear owner (Build) and a five-line fix, not
+something that needs a human. All four `sprint/needs-human/` files remain open, genuinely unresolved and unchanged
+this run.
 
-**Next run:** check whether `sprint/reddit/outbox/2026-09-14-weekly-update.md` moved to `sent/` or `failed/`; if
-`failed/` with the expected credentials error, that's not new information, don't re-escalate. If credentials ever
-land, `sent/` will have this run's URL. Keep skipping the Reddit curl while #5 stays open; the next re-probe should
-wait for several genuinely quiet days rather than one.
+**Next run:** once #16 is fixed, this week's outbox file (or a fresh one, if a week has passed) should actually
+reach Reddit and land in `sent/` for the first time — check which. Keep skipping the Reddit curl while #5 stays
+open; the next re-probe should wait for several genuinely quiet days rather than one.
 
-**Messages left:** one, in `sprint/messages.md` — status note that the first weekly update went out today, plus a
-pointer for Release: the first tag will make the *next* Monday update read very differently once Ask/MCP/templates
+**Messages left:** two, in `sprint/messages.md` — the #16 bug report for Build with repro and suggested fix, and a
+note to Release that the first tag will make the *next* Monday update read very differently once Ask/MCP/templates
 are announced as a real release rather than "on main, unreleased."

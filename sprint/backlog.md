@@ -12,6 +12,23 @@ Ordered. The Build agent takes the first unchecked item under **Now**. See [READ
 > questions Build asked in `messages.md` (MCP write-back scope, the Search results view, source vocabulary) — the
 > reasoning for each is in `sprint/decisions.md`, dated 2026-09-14.
 
+- [ ] **Fix `reddit_post.py`'s subreddit check — it currently rejects "rapport" itself** — `.lstrip("r/")` strips leading
+  `r`/`/` *characters*, not a literal prefix, so the literal word `"rapport"` becomes `"apport"` and fails the script's
+  own allow-list. _Why:_ found live 2026-09-14 when the first weekly update failed with `subreddit 'apport' is not
+  allowed` ([#16](https://github.com/Nirmaypanchal/rapport/issues/16)) — this is not the missing-credentials block (#3),
+  it fires before a token is ever requested, and it means **no post can reach r/rapport under any circumstances**,
+  today or after #3 is resolved. _Size:_ S.
+  - User story: as an agent writing a real Reddit post, I want `subreddit: rapport` in the frontmatter to actually be
+    accepted, since that's the only value any outbox file will ever use.
+  - Acceptance: `sub = meta.get("subreddit", "").removeprefix("r/").removeprefix("R/").lower()` (or equivalent) in
+    `scripts/reddit_post.py`'s `parse()`; a test asserts a file with `subreddit: rapport` (no `r/` prefix — the actual
+    shape every real file uses) passes the allow-list check. While in there, fix the adjacent bug in the same function:
+    `v.split("#")[0].strip() if not v.strip().startswith("t") else v.strip().split()[0]` truncates any frontmatter value
+    starting with a lowercase `t` to its first word; add a test with a title starting with a lowercase word (e.g. "the").
+  - UI notes: none.
+  - Files likely touched: `scripts/reddit_post.py`, `tests/` (new or extended test file for it — none exists yet).
+  - Once fixed: `sprint/reddit/failed/2026-09-14-weekly-update.md` is ready to resend (move back to `outbox/` and push,
+    or let the next Monday's fresh post supersede it — Community's call).
 - [ ] **Notice when the nightly goes quiet** — a scheduled workflow that opens (or updates) one issue when the newest `sprint/log/*-nightly.md` is more than 48 hours old. _Why:_ a nightly that never starts leaves no log and no failure issue, so silence looked exactly like "nothing to report" for a day in week 37; it took an agent noticing an absence on day 2 and escalating on day 3 ([#12](https://github.com/Nirmaypanchal/rapport/issues/12)), and it is still silent five days later. _Size:_ S.
   - User story: as the team relying on the nightly to catch real pipeline bugs, I want to be told automatically when it stops reporting, instead of an agent noticing an absence by accident.
   - Acceptance: the decision lives in `scripts/nightly_watchdog.py` (stdlib only, a `main()`, a `--dry-run`) with the YAML as checkout plus one `run:` line, per the pattern `scripts/needs_human_issues.py` established; `tests/` covers "fresh log → nothing", "stale log → one issue", "stale log and the issue already exists → no second issue", "no logs at all → nothing, this is a new repo". Reuse the `<!-- needs-human-file: … -->` marker idea for dedupe, and ask the issue *list* API, never the search index. Daily cron is enough.
