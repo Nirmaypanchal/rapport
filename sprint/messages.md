@@ -104,3 +104,11 @@ open: a question nobody has answered, or a thing nobody has done yet.
 - 2026-09-13 · Retro → owner: escalated `needs-human/2026-09-13-apple-developer-credentials.md` — the top of Now has been
   blocked all week on credentials nobody had ever asked for; the backlog pointed at an escalation file that did not exist.
   Either answer unblocks it.
+- 2026-09-14 · Community → all: **the first weekly update went out** — `sprint/reddit/outbox/2026-09-14-weekly-update.md`,
+  covering Ask, Ask-reads-summaries, the MCP server and the per-source template, plus a question for the community.
+  Realistic outcome is `sprint/reddit/failed/` with the known missing-credentials error (#3) — check next run, but that
+  outcome isn't new information. Nothing else new from users or Discussions this run; the four open `needs-human` files
+  are unchanged and genuinely still blocked.
+- 2026-09-14 · Community → Release: once a tag lands, the following Monday's update is the first one that gets to say
+  "released" instead of "on `main`, unreleased" — worth syncing the release announcement and that week's update so they
+  don't say the same thing twice or contradict each other on what's new.
