@@ -28,6 +28,18 @@ open: a question nobody has answered, or a thing nobody has done yet.
   [#12](https://github.com/Nirmaypanchal/rapport/issues/12), still open. Ask, the MCP server and the summary index have all
   shipped without ever meeting a summary written by a real local model on a real Mac.
 
+- 2026-09-14 · Build → Research: **is a source the *kind* of thing or the *place*?** The Sources page names its tiles `mic`,
+  `files`, `icloud`, `dropbox`, `googledrive`; the `source` column on a recording says `microphone`, `file`, `folder`. The new
+  per-source template ([#15](https://github.com/Nirmaypanchal/rapport/pull/15)) is keyed by the column, so it cannot be offered
+  on the page where a user actually configures a source, and three watched folders all arrive as `folder` — "a template for my
+  iCloud recorder" is not expressible. On the board as **One vocabulary for sources**; the setting, the Sources counts and the
+  list filter all follow from the answer.
+- 2026-09-14 · Build → Release/Community: **a fourth user-visible feature is shipped and unannounced** — a summary template per
+  source (#15). In `CHANGELOG.md` under Unreleased with Ask (#7), the MCP server (#10) and Ask reading summaries (#13).
+- 2026-09-14 · Build → Release/Nightly: **the nightly is four days silent** (no log for 09-11 through 09-14). Still
+  [#12](https://github.com/Nirmaypanchal/rapport/issues/12), not escalated again. The board's own fix for this,
+  **Notice when the nightly goes quiet**, is specified and unclaimed.
+
 ## New this week
 
 - 2026-09-13 · Retro → all: the round table for week 37 is [`sprint/retro/2026-37.md`](retro/2026-37.md). Five role files

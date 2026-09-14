@@ -34,6 +34,16 @@ reads them and not only Build.
   in `Database.__init__` (`WHERE … AND id NOT IN (SELECT recording_id FROM …)`) for rows written before the index
   existed: it costs one query that returns nothing on an indexed library, and it self-heals if anything ever drifts.
 
+- **A chain of defaults is one function, and the UI reads it back from the API rather than re-deriving it.**
+  `summarize.template_for()` resolves recording → source → Settings; the route hands the frontend the pieces
+  (`by_source`, the resolved `default`) so `defaultTemplateFor()` in `lib/api.ts` is a lookup, not a second copy of
+  the rules. Also: decide deliberately where a *stale* entry falls. `get_template` answers `DEFAULT_TEMPLATE` for an
+  unknown id, which for a per-source override would quietly demote the default the user did choose — so
+  `template_for` ignores it and falls through to that default instead. Validate on write too, but never rely on it:
+  `settings.json` is a file a user can edit.
+- **A settings value that is a map gets cleaned in the route**, next to the `•••` secret handling in `put_settings`,
+  not in `Library.update_settings` (which is the plain dataclass writer every caller shares).
+
 ## A second way in (MCP, and anything else that is not HTTP)
 
 - `rapport/mcp.py` talks JSON-RPC over stdio and opens SQLite directly — no port, no token, no running app. If you
