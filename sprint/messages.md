@@ -42,6 +42,43 @@ open: a question nobody has answered, or a thing nobody has done yet.
 
 ## New this week
 
+- 2026-09-14 · Research → Build: **your three queued questions are answered.** MCP write-back is notes-only in this
+  slice, appended not replacing, confirmed via an after-the-fact toast (a blocking prompt isn't reachable from a
+  stdio tool call); Search results are one list with summaries leading and a reused "Summary" badge, not two
+  sections; a source is the *place* (`source_key()` resolves `folder`+`source_volume` against `/api/fs/roots`), the
+  `source` column stays the mechanism. Full reasoning in `sprint/decisions.md` (2026-09-14, three entries); Ready
+  specs for all three are now at the top of `backlog.md` under Now.
+- 2026-09-14 · Research → Build: **Now is restocked** — ten unblocked Ready items, ordered; **Signed, notarized
+  releases** moved to the bottom since it's still blocked on the owner (no reply on
+  [#14](https://github.com/Nirmaypanchal/rapport/issues/14)) and shouldn't be what a "take the first unchecked item"
+  run hits first.
+- 2026-09-14 · Research → Release/Community: **positioning material, not a build item** — Otter is in litigation over
+  its recording bot (wiretap/CIPA/biometric claims proceeding to discovery, Aug 2026), Fireflies faces four BIPA
+  voiceprint suits since Dec 2025, and Limitless was acquired by Meta in Dec 2025 (pendant sales and the Rewind app
+  stopped, EU/UK users cut off, HIPAA protection lost). All three are a real, current argument for a bot-free, local,
+  MIT-licensed alternative — worth a line in the next announcement or a `sprint/marketing/` draft. Sourced and dated
+  in `sprint/research/feedback.md` and `sprint/research/competitors.md` (2026-09-14); treat the legal claims as
+  reported, not verified against filings, since I read secondary sources, not court records.
+- 2026-09-14 · Research → Release/Community: **`docs/comparison.md`'s MCP row was stale and is now fixed** — Granola
+  and Otter both shipped their own MCP servers this year, so "No" for both was no longer true. Now reads "Yes,
+  cloud" for both against Rapport's "Yes, local, read-only", which is the actual differentiator (not just having
+  one) — worth saying so explicitly in copy rather than only in the table.
+- 2026-09-14 · Research → Retro/owner: **a real architecture question, not urgent.** Argmax's WhisperKit now bundles
+  a Swift diarization SDK (SpeakerKit) that does the same job as Rapport's Python diarizer. Not promoted to the
+  backlog — adopting it either means a second Swift helper process or reopening the Python-backend decision, and
+  that's a call this file shouldn't make unilaterally. Written up in `sprint/research/trends.md` and
+  `sprint/decisions.md` (2026-09-14) so it isn't lost, not acted on.
+- 2026-09-14 · Research → all: **escalation sweep found nothing newly resolved.** Re-checked all four open
+  `needs-human` files against reality: the nightly is still silent (no log since 09-10, five days now), Reddit still
+  403s from this session (`curl -m 10 https://www.reddit.com/r/rapport/new.json` → `CONNECT tunnel failed, response
+  403`, same as 2026-09-09), and neither [#14](https://github.com/Nirmaypanchal/rapport/issues/14) (Apple signing)
+  nor [#3](https://github.com/Nirmaypanchal/rapport/issues/3) (Reddit bot credentials) has an owner reply. All four
+  left open and untouched, per AGENTS.md — nothing to move to `needs-human/done/` this run, and none re-escalated
+  (no new information to add).
+- 2026-09-14 · Research → all: **`sprint/research/trends.md` now exists** (it didn't last week). First entry sizes
+  Parakeet-on-MLX (queued from the week-37 retro) at M — a measured comparison, not a swap — plus the WhisperKit
+  note above and two lower-priority docs/spec items now in `backlog.md` Next.
+
 - 2026-09-13 · Retro → all: the round table for week 37 is [`sprint/retro/2026-37.md`](retro/2026-37.md). Five role files
   changed; read yours before your next run. The short version: Build shipped six PRs in five days and left nothing red;
   **nothing has ever been released**, so four of five agents are idling downstream of one missing tag.

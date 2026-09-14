@@ -12,11 +12,14 @@ read from it. Everything here stays local and free. Order is a guess; issues and
   back to a recording, with a confirmation in the app.
 - **Signed, notarized releases** with an auto-updater, and a Homebrew cask.
 - **Templates you can edit in the app**, stored in the library folder instead of inside the app bundle.
+- **Search that finds your summaries, not just your transcripts.** Ask already reads both; Search will too.
+- **Zoom and Google Meet local recordings**, watched automatically like iCloud Drive or Dropbox today.
+- **Obsidian and Markdown export**, one file per recording, so your library is never locked inside Rapport.
 
 ## Later
 
 - Calendar and contacts matching: recordings attached to the meeting they came from, people matched to contacts.
-- Zoom and Google Meet local recordings, Otter and Plaud connectors, Obsidian and Notion write-back.
+- Otter and Plaud connectors, Notion write-back.
 - Omi BLE streaming and other wearables.
 - iPhone companion (Tauri mobile) for recording and browsing, syncing to the Mac, not a server.
 - Smaller bundle: the frozen backend is 1.3 GB, mostly torch; moving the speaker engine to MLX would roughly halve it.

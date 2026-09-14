@@ -2,6 +2,51 @@
 
 Newest first. One paragraph each: what, why, what it rules out.
 
+- **2026-09-14 · A source is the place, and the `source` column stays the mechanism.** The Sources page names tiles by
+  where a recording came from (`icloud`, `dropbox`, `googledrive`, plus a generic `folder`); the `recording.source`
+  column names the *mechanism* Rapport used to get it (`folder`, `usb`, `microphone`, `file`, `voicememos`, …), which
+  is what import dedup and connector logic need and must not change. The fix is not to rename the column; it's to
+  resolve the *place* only where the user actually chooses one — `summary_template_by_source`, the Settings picker,
+  and the Sources page counts — the same way `server.py`'s `/api/fs/roots` already resolves iCloud/Dropbox/Google
+  Drive from a folder path, and the same way `sources-view.tsx`'s `rootOf`/`watching` already do it client-side for
+  the page it was built for. A `folder`-sourced recording's `source_volume` already holds the exact watched path
+  (`importer.py`), so nothing new needs storing — a lookup was always possible, just not written. Backend gains one
+  small helper that maps `(source, source_volume)` to the place-level id (`icloud`/`dropbox`/`googledrive`/`folder`
+  for folders, and the existing 1:1 names — `mic` for `microphone`, `files` for `file` — for everything else) using
+  the same roots list `/api/fs/roots` returns, and every place that offers a per-source choice to a user calls that
+  helper instead of reading `source` raw. Rules out: renaming or migrating the `source` column, and exposing the
+  tile's naming inconsistency (`mic`/`microphone`, `files`/`file`) to the database schema. See the Ready spec in
+  `backlog.md`.
+- **2026-09-14 · Search results mix moments and summaries in one list, led by summaries, not two groups.** Mobbin
+  precedent (Dropbox Dash's omnibox, Tana's unified library table) shows mixed-type result lists using an inline
+  badge per row rather than splitting into separate sections — readers scan one list, not two. Rapport already
+  solved this exact rendering problem for Ask (`ask-panel.tsx`'s `Source` component: a `FileText` icon and "Summary"
+  badge for a summary excerpt, opening the recording's Summary tab instead of a timestamp), so Search reuses that
+  same visual language rather than inventing a second one. Because a summary's bm25 score and a turn's bm25 score
+  come from two different FTS tables and are not comparable, results are not merged onto one fake combined
+  relevance rank: summary hits (capped, since a summary is denser evidence per the reasoning already written in
+  `ask.py`) lead the list, moment hits fill the rest, and there is no section header — exactly one list. Rules out:
+  a second tab or a visually separate "Summaries" panel, and pretending the two bm25 scores are on the same scale.
+- **2026-09-14 · MCP write-back, slice 2: a note appended to a recording, confirmed per write, nothing else yet.**
+  Answering Build's queued question (`messages.md`, 2026-09-11): the first writable thing is the smallest one
+  already in the schema — appending to `recordings.notes` — not a tag (people/tag data model isn't settled) and not
+  a summary (overwriting the summary Rapport wrote is a bigger, separate decision about trust in an assistant's
+  words vs. the local model's). Every write is one tool call, one recording, one appended note; there is no bulk or
+  "write to every recording matching X" tool. The confirmation lives where confirmations already live in this app —
+  a native macOS dialog-style prompt via the same mechanism `useConfirm()` uses in the frontend is not reachable
+  from a stdio MCP process with no UI of its own, so the confirmation must be a toast/notification the app raises
+  when it sees a new note appear from an MCP write (distinguishable from a user-typed note by a source marker on the
+  note, e.g. a `[via <client name>]` prefix or a dedicated column), not a blocking prompt the assistant waits on —
+  MCP's hand-rolled server here has no elicitation support to block on (see the 2026-09-11 "hand-written, not an SDK"
+  decision). Rules out: a write tool for tags or summaries in this slice, and any write tool that is not scoped to
+  one recording by id. See the Ready spec in `backlog.md`; `test_no_tool_writes_to_the_library` becomes
+  `test_only_notes_tool_writes_to_the_library` or equivalent, not deleted.
+- **2026-09-14 · WhisperKit + SpeakerKit (the Swift diarization SDK) is not adopted, pending a real architecture
+  decision.** Argmax shipped diarization inside the same Swift package as its Whisper engine; Rapport's diarizer does
+  the same job in Python. Swapping it in either means a second Swift helper process alongside the Python backend
+  (real IPC and packaging complexity) or reopening "Python backend, no ORM" (`AGENTS.md`, `sprint/decisions.md`
+  2026-09-11 MCP entry references the same weight-budget reasoning). Neither is a Ready backlog item; both are the
+  kind of call this file exists to record before anyone builds against it. See `sprint/research/trends.md`.
 - **2026-09-13 · The nightly release gate expires after seven silent days.** Release still may not ship on a nightly that
   ran and failed — that part is absolute. But when the newest `sprint/log/*-nightly.md` is more than a week old, the machine
   is not reporting rather than failing, and a gate with no timeout is a gate that can close forever: week 37 ended with three

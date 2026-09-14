@@ -15,7 +15,7 @@ Honest, and probably incomplete: these products change. Corrections welcome as p
 | Summaries | Local model (Ollama/MLX) | Cloud | Cloud | Cloud | Cloud or local | Cloud |
 | Full-text search across everything | Yes | Yes | Yes | Yes | Per file | Yes |
 | Ask a question, answered from your own transcripts | Yes, local model | Yes, cloud | Yes, cloud | Yes, cloud | No | Yes, cloud |
-| Inside Claude, Cursor or any MCP client | Yes, local, read-only | No | No | No | No | No |
+| Inside Claude, Cursor or any MCP client | Yes, local, read-only | Yes, cloud | No | Yes, cloud | No | No |
 | Pulls transcripts from Granola / Notion / Omi | Yes | No | No | — | No | No |
 | Meeting bot required | No | Optional | Yes | No | No | No |
 | Data format | Plain audio + SQLite in a folder | Cloud | Cloud | Cloud | Files | Cloud |
