@@ -299,7 +299,7 @@ class Worker:
         self._summarize(rid, target)
 
     def _summarize(self, rid: int, target: tuple[str, str]) -> None:
-        from .summarize import get_template, summarize
+        from .summarize import summarize, template_for
 
         provider, model = target
         with self._summary_lock:
@@ -309,9 +309,12 @@ class Worker:
             self.db.update_recording(rid, summary_status="running")
             try:
                 s = self.library.settings
-                # The recording's own choice wins; otherwise the default from Settings, resolved now and recorded
-                # with the summary so the UI can show which shape produced this text.
-                template = get_template(rec.get("summary_template") or s.summary_template, s.summary_custom_prompt)
+                # The recording's own choice wins, then the default for the source it came from, then the one in
+                # Settings — resolved now and recorded with the summary so the UI can show which shape wrote it.
+                template = template_for(
+                    rec.get("summary_template"), rec.get("source"),
+                    s.summary_template_by_source, s.summary_template, s.summary_custom_prompt,
+                )
                 names = {sp["label"]: (sp["person_name"] or sp.get("display_name") or sp["label"]) for sp in self.db.get_speakers(rid)}
                 text = summarize(self.db.get_segments(rid), names, provider, model, rec.get("title") or rec["original_name"], template)
                 if not text:

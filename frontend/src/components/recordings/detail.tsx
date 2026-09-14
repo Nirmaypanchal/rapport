@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { ArrowLeft, Download, FileText, RefreshCw, Scissors, Trash2 } from "lucide-react";
 import { api, exportRecording, fetcher, urls, type Recording } from "@/lib/api";
 import { useConfirm } from "@/components/confirm";
-import { fmtClock, fmtDate, fmtDur, fmtTime, recordingTitle } from "@/lib/format";
+import { fmtClock, fmtDate, fmtDur, fmtTime, recordingTitle, sourceLabel } from "@/lib/format";
 import { usePlayer } from "@/lib/use-player";
 import { useStatus } from "@/lib/use-status";
 import { Transport } from "./transport";
@@ -155,10 +155,6 @@ export function RecordingDetail({ id, seekTo, openTab, onListChanged }: { id: nu
       {done && hasAudio && <Transport r={r} player={player} minGap={minGap} pad={pad} follow={follow} onFollow={setFollow} />}
     </div>
   );
-}
-
-export function sourceLabel(src: Recording["source"]): string {
-  return { dji: "DJI Mic", voicememos: "Apple Voice Memos", file: "imported file", usb: "USB drive", folder: "watched folder", microphone: "microphone", granola: "Granola", omi: "Omi", notion: "Notion" }[src ?? "dji"] ?? String(src);
 }
 
 function Details({ r }: { r: Recording }) {

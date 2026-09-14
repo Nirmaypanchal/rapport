@@ -41,6 +41,11 @@ export function dayKey(iso: string | null | undefined): string {
   return iso ? iso.slice(0, 10) : "unknown";
 }
 
+/** Where a recording came from, in the words the app uses for it. A row written before the column existed is a DJI file. */
+export function sourceLabel(src: string | null | undefined): string {
+  return { dji: "DJI Mic", voicememos: "Apple Voice Memos", file: "imported file", usb: "USB drive", folder: "watched folder", microphone: "microphone", granola: "Granola", omi: "Omi", notion: "Notion" }[src ?? "dji"] ?? String(src);
+}
+
 export function recordingTitle(r: { title?: string | null; recorded_at?: string | null; transmitter?: string | null; original_name: string }): string {
   if (r.title) return r.title;
   if (r.recorded_at) return `${fmtDate(r.recorded_at)}, ${fmtClock(r.recorded_at)}${r.transmitter ? ` · ${r.transmitter}` : ""}`;

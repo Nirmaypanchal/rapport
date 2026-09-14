@@ -12,7 +12,9 @@ from rapport.summarize import (
     build_system,
     builtin_templates,
     get_template,
+    source_key,
     split_summary,
+    template_for,
     templates,
 )
 
@@ -58,6 +60,36 @@ def test_custom_template_needs_a_prompt():
     assert get_template(CUSTOM_TEMPLATE).id == DEFAULT_TEMPLATE, "an empty custom prompt is not usable"
     t = get_template(CUSTOM_TEMPLATE, "Answer in haiku.")
     assert t.id == CUSTOM_TEMPLATE and t.prompt == "Answer in haiku."
+
+
+def test_template_for_prefers_the_recordings_own_choice():
+    # A pick made in the Summary tab, or the shape the last summary was written in, beats both defaults.
+    t = template_for("interview", source="granola", by_source={"granola": "sales-call"}, default="lecture")
+    assert t.id == "interview"
+
+
+def test_template_for_uses_the_default_set_for_the_source():
+    by_source = {"granola": "meeting", "voicememos": "journal"}
+    assert template_for(None, "voicememos", by_source, "meeting").id == "journal"
+    assert template_for(None, "granola", by_source, "journal").id == "meeting"
+    # A source with nothing set for it falls through to the one default in Settings.
+    assert template_for(None, "dji", by_source, "lecture").id == "lecture"
+    assert template_for(None, "dji", {}, "lecture").id == "lecture"
+    assert template_for(None, None, None, None).id == DEFAULT_TEMPLATE
+
+
+def test_a_recording_with_no_source_is_filed_as_dji():
+    # `source` arrived after the first releases, so rows written before it are NULL and are DJI mic files.
+    assert source_key(None) == "dji" and source_key("") == "dji" and source_key(" granola ") == "granola"
+    assert template_for(None, None, {"dji": "journal"}, "meeting").id == "journal"
+
+
+def test_an_unusable_source_default_falls_back_to_the_users_default_not_to_meeting():
+    # The distinction that matters: a stale entry must not quietly demote the default the user did choose.
+    assert template_for(None, "omi", {"omi": "no-such-template"}, "lecture").id == "lecture"
+    assert template_for(None, "omi", {"omi": CUSTOM_TEMPLATE}, "lecture").id == "lecture", "custom with no prompt"
+    t = template_for(None, "omi", {"omi": CUSTOM_TEMPLATE}, "lecture", "Answer in haiku.")
+    assert t.id == CUSTOM_TEMPLATE
 
 
 def test_build_system_keeps_the_rules_and_adds_the_shape():

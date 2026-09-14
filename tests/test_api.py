@@ -112,6 +112,33 @@ def test_summary_template_default_follows_settings(library, db):
     assert _client(library, db).get("/api/summary/templates").json()["default"] == "custom"
 
 
+def test_summary_templates_list_the_sources_in_the_library(library, db):
+    db.insert_recording(sha256="a" * 64, original_name="a.wav", rel_path="audio/a.wav", source="granola")
+    db.insert_recording(sha256="b" * 64, original_name="b.wav", rel_path="audio/b.wav", source="granola")
+    db.insert_recording(sha256="c" * 64, original_name="c.m4a", rel_path="audio/c.m4a", source="voicememos")
+    body = _client(library, db).get("/api/summary/templates").json()
+
+    assert [s["id"] for s in body["sources"]] == ["granola", "voicememos"], "the most-used source first"
+    assert body["sources"][0]["count"] == 2
+    assert body["by_source"] == {}, "nothing is defaulted for a source until the user says so"
+
+
+def test_a_source_default_round_trips_and_is_cleaned(library, db):
+    c = _client(library, db)
+    c.put("/api/settings", json={"patch": {"summary_template_by_source": {"voicememos": "journal"}}})
+    body = c.get("/api/summary/templates").json()
+    assert body["by_source"] == {"voicememos": "journal"}
+    assert [s["id"] for s in body["sources"]] == ["voicememos"], "a source with an override shows with no recordings"
+
+    # A template that does not exist is not stored, and neither is a source with no name.
+    c.put("/api/settings", json={"patch": {"summary_template_by_source": {"omi": "no-such-template", "": "journal"}}})
+    assert library.settings.summary_template_by_source == {}
+    assert c.get("/api/summary/templates").json()["by_source"] == {}
+
+    c.put("/api/settings", json={"patch": {"summary_template_by_source": "not a map"}})
+    assert library.settings.summary_template_by_source == {}
+
+
 def test_summarize_stores_the_chosen_template(library, db):
     worker = _Worker()
     rid = db.insert_recording(sha256="2" * 64, original_name="y.wav", rel_path="audio/y.wav", status="done")

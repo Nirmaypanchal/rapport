@@ -70,6 +70,9 @@ class Settings:
     auto_summarize: bool = True      # summarize each recording right after processing
     summary_template: str = "meeting"  # default shape for new summaries; a recording can override it
     summary_custom_prompt: str = ""    # used when summary_template is "custom"
+    # Per-source defaults: {"granola": "meeting", "voicememos": "journal"}. A source missing here uses
+    # summary_template. Empty by default, so a library that never sets one behaves exactly as before.
+    summary_template_by_source: dict[str, str] = field(default_factory=dict)
 
     # Playback
     skip_silence_min_gap: float = 0.7  # pauses shorter than this are kept (seconds)

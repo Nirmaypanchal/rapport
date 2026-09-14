@@ -136,12 +136,30 @@ def create_app(library: Library, db: Database, importer: Importer, worker, recor
 
     # ---- settings ----------------------------------------------------------
 
+    def _clean_template_by_source(value) -> dict:
+        """Keep only `source -> a template that exists`. Anything else is dropped rather than stored.
+
+        Settings are also a file a user can edit, so this is not the only way a bad entry can arrive — the resolver
+        in `summarize.template_for` ignores one too. This just stops the app writing one itself.
+        """
+        from .summarize import source_key, templates as summary_templates
+
+        if not isinstance(value, dict):
+            return {}
+        ids = {t.id for t in summary_templates(library.settings.summary_custom_prompt)}
+        return {
+            source_key(src): tid for src, tid in value.items()
+            if isinstance(src, str) and src.strip() and isinstance(tid, str) and tid in ids
+        }
+
     @app.put("/api/settings")
     def put_settings(body: SettingsPatch):
         patch = dict(body.patch)
         for k in ("hf_token", "granola_api_key", "omi_api_key", "notion_token"):
             if patch.get(k) == "•••":
                 patch.pop(k)
+        if "summary_template_by_source" in patch:
+            patch["summary_template_by_source"] = _clean_template_by_source(patch["summary_template_by_source"])
         before = library.settings.to_json()
         library.update_settings(patch)
         after = library.settings.to_json()
@@ -467,13 +485,26 @@ def create_app(library: Library, db: Database, importer: Importer, worker, recor
 
     @app.get("/api/summary/templates")
     def summary_templates_route():
-        """The shapes a summary can take: the built-in ones plus the user's own prompt."""
+        """The shapes a summary can take, the default, and the defaults set for particular sources.
+
+        `sources` is what the library actually holds, so Settings can offer a row per source in use rather than a
+        list of every source Rapport can import from. A source with an override set is always in it, even at zero
+        recordings, so an override can be seen and cleared.
+        """
         from .summarize import get_template, templates as summary_templates
 
         s = library.settings
+        known = summary_templates(s.summary_custom_prompt)
+        by_source = {k: v for k, v in (s.summary_template_by_source or {}).items() if v in {t.id for t in known}}
+        counts = db.source_counts()
         return {
-            "templates": [t.to_json() for t in summary_templates(s.summary_custom_prompt)],
+            "templates": [t.to_json() for t in known],
             "default": get_template(s.summary_template, s.summary_custom_prompt).id,
+            "by_source": by_source,
+            "sources": [
+                {"id": src, "count": counts.get(src, 0)}
+                for src in sorted(set(counts) | set(by_source), key=lambda k: (-counts.get(k, 0), k))
+            ],
         }
 
     @app.post("/api/recordings/{rid}/reprocess")

@@ -62,6 +62,13 @@ invent a fact, a name or a number — and a **template** decides the sections:
 
 Settings → Summary template sets the default for new recordings. Any recording can use a different one: pick it in the
 Summary tab and press Regenerate. Existing summaries are left alone until you do — nothing is rewritten behind your back.
+
+Most libraries hold two or three kinds of recording at once, and which kind a recording is usually follows from where it
+came from: a Granola sync is a meeting, a voice memo on a walk is not. **Settings → Template by source** gives each source
+you import from a template of its own, so new summaries take the right shape without anyone picking. It lists the sources
+your library actually holds recordings from; a source you leave alone uses the default above, and a recording you have
+picked a template for yourself keeps that one. Rapport sets none of these for you.
+
 The templates are plain Markdown files in `rapport/templates/`, so you can edit them or add your own. Notes that arrive
 from Granola or Omi keep the summary those apps wrote.
 

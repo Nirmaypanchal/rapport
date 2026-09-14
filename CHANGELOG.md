@@ -6,6 +6,11 @@ All notable changes to Rapport. The format follows Keep a Changelog; versions fo
 
 ### Added
 
+- **A summary template per source.** A Granola sync is a meeting; a voice memo on a walk is not. Settings → Template
+  by source gives each source you import from a template of its own, and new summaries take that shape without
+  anyone picking: a recording's own template still wins, then its source's, then the one default. The list shows the
+  sources your library actually holds recordings from, nothing is set for you, and existing summaries are untouched
+  until you press Regenerate.
 - **Ask your library.** A second tab on the Search page answers a question from your own transcripts: full-text
   retrieval picks the moments, the local model writes a few sentences and cites each one, and every citation jumps to
   the excerpt and opens the recording where the words were said. With no local model installed you still get the

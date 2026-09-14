@@ -116,6 +116,8 @@ export type Settings = {
   auto_summarize: boolean;
   summary_template: string;
   summary_custom_prompt: string;
+  /** Per-source defaults, `{ granola: "meeting" }`. A source that is not a key uses `summary_template`. */
+  summary_template_by_source: Record<string, string>;
   usb_volumes: string[];
   watched_folders: string[];
   granola_api_key: string; granola_auto: boolean;
@@ -205,7 +207,20 @@ export type LogLine = { id: number; ts: string; level: "info" | "warn" | "error"
 
 /** A shape a summary can take. `builtin` ones ship with the app; the other is the user's own prompt. */
 export type SummaryTemplate = { id: string; name: string; description: string; builtin: boolean };
-export type SummaryTemplates = { templates: SummaryTemplate[]; default: string };
+export type SummaryTemplates = {
+  templates: SummaryTemplate[];
+  /** The default from Settings, already resolved (a "custom" with no prompt written comes back as "meeting"). */
+  default: string;
+  /** Defaults set for particular sources; only entries naming a template that exists. */
+  by_source: Record<string, string>;
+  /** The sources this library holds recordings from, most first, plus any that carry an override. */
+  sources: { id: string; count: number }[];
+};
+
+/** The template a recording without one of its own will be summarized with: its source's default, else the default. */
+export function defaultTemplateFor(source: string | null | undefined, tpl: SummaryTemplates | undefined): string {
+  return tpl ? (tpl.by_source?.[source || "dji"] ?? tpl.default) : "";
+}
 
 export class ApiError extends Error {
   status: number;
