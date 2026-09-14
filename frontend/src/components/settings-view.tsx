@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { api, fetcher, openExternal, type LogLine, type Settings, type SummaryTemplates } from "@/lib/api";
 
 type Providers = { ollama: string[]; mlx_default: string; active: { provider: string; model: string } | null };
+import { sourceLabel } from "@/lib/format";
 import { useStatus } from "@/lib/use-status";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,9 @@ const WHISPER = [
   ["mlx-community/whisper-small-mlx", "small (fast)"],
   ["mlx-community/whisper-base-mlx", "base (fastest)"],
 ];
+
+// "No template of its own" cannot be the empty string: a Select needs a value for the option to be selectable.
+const DEFAULT_FOR_SOURCE = "__default";
 
 function Row({ label, help, children }: { label: string; help?: string; children: React.ReactNode }) {
   return (
@@ -104,6 +108,37 @@ export function SettingsView() {
           </Row>
           <Row label="Summary template" help={tpl?.templates.find((t) => t.id === s.summary_template)?.description || "The shape new summaries take. Each recording can use a different one from its Summary tab."}>
             <Select value={s.summary_template} onValueChange={(v) => v && set("summary_template", v)}><SelectTrigger className="max-w-[360px] bg-surface"><SelectValue /></SelectTrigger><SelectContent>{tpl?.templates.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent></Select>
+          </Row>
+          <Row
+            label="Template by source"
+            help={tpl && !tpl.sources.length
+              ? "Once you have imported from a source, it appears here and can have a template of its own."
+              : "A Granola sync is a meeting; a voice memo usually is not. A source set here decides the template for new summaries of its recordings — a recording you have picked a template for yourself keeps that one."}
+          >
+            {tpl?.sources.length ? (
+              <div className="grid gap-1.5">
+                {tpl.sources.map((src) => (
+                  <div key={src.id} className="grid grid-cols-[1fr_auto] items-center gap-3 sm:grid-cols-[200px_1fr]">
+                    <span className="text-[13px]">{sourceLabel(src.id)} <span className="tc text-ink-3">{src.count}</span></span>
+                    <Select
+                      value={s.summary_template_by_source?.[src.id] ?? DEFAULT_FOR_SOURCE}
+                      onValueChange={(v) => {
+                        if (!v) return;
+                        const next = { ...(s.summary_template_by_source ?? {}) };
+                        if (v === DEFAULT_FOR_SOURCE) delete next[src.id]; else next[src.id] = v;
+                        set("summary_template_by_source", next);
+                      }}
+                    >
+                      <SelectTrigger className="h-8 max-w-[360px] bg-surface text-[13px]" aria-label={`Summary template for ${sourceLabel(src.id)}`}><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={DEFAULT_FOR_SOURCE}>Use the default ({tpl.templates.find((t) => t.id === tpl.default)?.name ?? tpl.default})</SelectItem>
+                        {tpl.templates.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </Row>
           {s.summary_template === "custom" && (
             <Row label="Custom prompt" help="Added after the rules that always hold (stay faithful, use the speaker names, write in the language of the transcript). Ask for the sections you want.">

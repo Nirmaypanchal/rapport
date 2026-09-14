@@ -16,6 +16,7 @@ import re
 import threading
 import urllib.error
 import urllib.request
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -180,6 +181,35 @@ def get_template(tid: str | None, custom_prompt: str = "") -> Template:
     if t is None or (t.id == CUSTOM_TEMPLATE and not t.prompt):
         t = by_id.get(DEFAULT_TEMPLATE) or next(iter(by_id.values()))
     return t
+
+
+def template_for(
+    recording_template: str | None = None,
+    source: str | None = None,
+    by_source: Mapping[str, str] | None = None,
+    default: str | None = None,
+    custom_prompt: str = "",
+) -> Template:
+    """Which shape a summary takes, deciding between the three places an answer can come from.
+
+    The recording's own template wins — it is either an explicit pick in the Summary tab or the shape its last
+    summary was written in. Otherwise the default for the source it came from (a Granola sync is a meeting; a
+    voice memo usually is not). Otherwise the one default in Settings.
+
+    A per-source entry naming a template that no longer exists is ignored rather than obeyed: it must fall through
+    to the user's own default, not to ``DEFAULT_TEMPLATE``, which is what ``get_template`` would do with it.
+    """
+    by_id = {t.id: t for t in templates(custom_prompt)}
+    for wanted in (recording_template, (by_source or {}).get(source_key(source))):
+        t = by_id.get(wanted or "")
+        if t is not None and not (t.id == CUSTOM_TEMPLATE and not t.prompt):
+            return t
+    return get_template(default, custom_prompt)
+
+
+def source_key(source: str | None) -> str:
+    """The key a recording's source is filed under. Rows written before the column existed are DJI mic files."""
+    return (source or "dji").strip() or "dji"
 
 
 def build_system(template: Template) -> str:
