@@ -40,8 +40,12 @@ Release both depend on these workflows doing what they claim.
 - **Never write "closes #N" or "fixes #N" in a commit message unless you mean it.** GitHub reads the keyword out of
   any commit that lands on `main`, whatever the sentence around it says. On 2026-09-15 a commit body describing the
   new watchdog ("the watchdog closes #12 itself when a log lands") closed [#12](https://github.com/Nirmaypanchal/rapport/issues/12),
-  an open escalation to the owner, seconds after it was pushed. Reopened with a comment saying why; history on `main`
-  is not rewritten for this. Write "will close #12" or name it without the verb.
+  an open escalation to the owner, seconds after it was pushed. It then happened **again** in the commit that wrote
+  this lesson down, because that message described the accident in a sentence with the same shape. Safe form: put the
+  verb after the number ("#12 was closed") or drop it; never a closing verb directly before `#N`, not even in a
+  quote. Reopen and then *verify* — `gh issue view N` or the API, not the tool's success reply, which is accurate
+  about the reopen and says nothing about the push that lands a second later. History on `main` is not rewritten for
+  this; the correction goes in a comment on the issue.
 - **In a workflow, a file's mtime is the checkout time, not when it was written.** `actions/checkout` stamps every file
   as it clones, so anything reasoning about how old a file is must read a date out of its name or its content. The
   watchdog above would have reported a week-old log as seconds old.
