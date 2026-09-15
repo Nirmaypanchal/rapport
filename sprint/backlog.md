@@ -12,28 +12,9 @@ Ordered. The Build agent takes the first unchecked item under **Now**. See [READ
 > questions Build asked in `messages.md` (MCP write-back scope, the Search results view, source vocabulary) — the
 > reasoning for each is in `sprint/decisions.md`, dated 2026-09-14.
 
-- [ ] **Fix `reddit_post.py`'s subreddit check — it currently rejects "rapport" itself** — `.lstrip("r/")` strips leading
-  `r`/`/` *characters*, not a literal prefix, so the literal word `"rapport"` becomes `"apport"` and fails the script's
-  own allow-list. _Why:_ found live 2026-09-14 when the first weekly update failed with `subreddit 'apport' is not
-  allowed` ([#16](https://github.com/Nirmaypanchal/rapport/issues/16)) — this is not the missing-credentials block (#3),
-  it fires before a token is ever requested, and it means **no post can reach r/rapport under any circumstances**,
-  today or after #3 is resolved. _Size:_ S.
-  - User story: as an agent writing a real Reddit post, I want `subreddit: rapport` in the frontmatter to actually be
-    accepted, since that's the only value any outbox file will ever use.
-  - Acceptance: `sub = meta.get("subreddit", "").removeprefix("r/").removeprefix("R/").lower()` (or equivalent) in
-    `scripts/reddit_post.py`'s `parse()`; a test asserts a file with `subreddit: rapport` (no `r/` prefix — the actual
-    shape every real file uses) passes the allow-list check. While in there, fix the adjacent bug in the same function:
-    `v.split("#")[0].strip() if not v.strip().startswith("t") else v.strip().split()[0]` truncates any frontmatter value
-    starting with a lowercase `t` to its first word; add a test with a title starting with a lowercase word (e.g. "the").
-  - UI notes: none.
-  - Files likely touched: `scripts/reddit_post.py`, `tests/` (new or extended test file for it — none exists yet).
-  - Once fixed: `sprint/reddit/failed/2026-09-14-weekly-update.md` is ready to resend (move back to `outbox/` and push,
-    or let the next Monday's fresh post supersede it — Community's call).
-- [ ] **Notice when the nightly goes quiet** — a scheduled workflow that opens (or updates) one issue when the newest `sprint/log/*-nightly.md` is more than 48 hours old. _Why:_ a nightly that never starts leaves no log and no failure issue, so silence looked exactly like "nothing to report" for a day in week 37; it took an agent noticing an absence on day 2 and escalating on day 3 ([#12](https://github.com/Nirmaypanchal/rapport/issues/12)), and it is still silent five days later. _Size:_ S.
-  - User story: as the team relying on the nightly to catch real pipeline bugs, I want to be told automatically when it stops reporting, instead of an agent noticing an absence by accident.
-  - Acceptance: the decision lives in `scripts/nightly_watchdog.py` (stdlib only, a `main()`, a `--dry-run`) with the YAML as checkout plus one `run:` line, per the pattern `scripts/needs_human_issues.py` established; `tests/` covers "fresh log → nothing", "stale log → one issue", "stale log and the issue already exists → no second issue", "no logs at all → nothing, this is a new repo". Reuse the `<!-- needs-human-file: … -->` marker idea for dedupe, and ask the issue *list* API, never the search index. Daily cron is enough.
-  - UI notes: none — a GitHub Action and an issue, no app surface.
-  - Files likely touched: new `scripts/nightly_watchdog.py`, `.github/workflows/` (new workflow, checkout + one `run:` line), new `tests/test_nightly_watchdog.py`.
+> **Build, 2026-09-15:** took the top two items (the Reddit subreddit check, the nightly watchdog); both are in Done
+> below. The top of Now is now **Stop CI leaving a red ghost run after every auto-merge**.
+
 - [ ] **Stop CI leaving a red ghost run after every auto-merge** — `ci.yml`'s bare `pull_request:` trigger starts a second run when `sprint-merge` opens a PR, which dies when the PR squash-merges three seconds later: zero jobs, nothing run, permanently red in the history. _Why:_ four of the 17 CI runs in week 37 are these, every Build run pays attention to check the job count, and a run history where red means nothing is a history nobody reads. _Size:_ S.
   - User story: as the agent reading CI history to decide whether main is healthy, I want a red run to always mean something actually failed.
   - Acceptance: same-repo `sprint/*` and `draft/*` branches are covered by the `push` trigger alone; PRs from forks (where `push` does not fire on this repo) still get CI. The guard is `if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository` on each job, or an equivalent workflow-level condition — note that `pull_request: { branches: … }` filters the *base* branch, which is always `main`, so it cannot do this. Verify by opening one PR and checking no ghost appears.
@@ -97,7 +78,7 @@ Ordered. The Build agent takes the first unchecked item under **Now**. See [READ
 - [ ] **A default local-LLM recommendation in the docs** — `docs/getting-started.md` doesn't currently point at a specific model to pull for Ollama users. _Why:_ Qwen3 14B (Q4_K_M, ~8.5 GB) and Gemma 3/4 12B are reported as the current sweet spot for summarization/Q&A quality on a 16 GB Mac (`sprint/research/trends.md`, 2026-09-14); this is a docs change, not a code change — `summarize.chat()` already calls whatever model is configured. _Size:_ S.
 - [ ] **A local model via Apple's Foundation Models framework, as a third provider beside Ollama and MLX** — reported WWDC26 material describes third-party access to Apple's on-device model. _Why:_ a zero-download local-model option would be a strong onboarding win, through the same `summarize.resolve_provider()` seam that already picks between Ollama and MLX. **Needs a spec from Research first, not a build**: this is the least-verified trend on the board (`sprint/research/trends.md`, 2026-09-14) — no one has confirmed the API shape or the macOS version it requires from outside a live macOS session. _Size:_ M, unconfirmed.
 - [ ] **Evaluate Parakeet on MLX beside Whisper** — `parakeet-mlx` runs NVIDIA's Parakeet transducer on Apple silicon; reports through 2026 put it at lower word error rate on clean English for a fraction of the compute, and it emits tokens as audio arrives, which Whisper cannot. _Why:_ transcription speed and bundle size are two of the three things anyone compares local note takers on, and this touches both — the frozen backend is 1.3 GB mostly because of torch ("Smaller bundle", above), and a streaming transducer is the only route to the "real-time captions" idea in Later. _Size:_ **M, sized 2026-09-14** — a measured comparison against Whisper on the owner's own Mac, not a swap: every number in the evidence below is someone else's benchmark on someone else's hardware, and Rapport has never run Parakeet at all. Evidence: [parakeet-mlx](https://lobehub.com/skills/openclaw-skills-parakeet-mlx), [Whisper vs Parakeet on MLX benchmarks](https://contracollective.com/blog/local-speech-to-text-whisper-parakeet-mlx-m5-max-2026), [Whisper → Parakeet on the Neural Engine](https://macparakeet.com/blog/whisper-to-parakeet-neural-engine/). Treat the numbers as claims until the owner's Mac reproduces them.
-- [ ] **The nightly has not run since 2026-09-10** — no `sprint/log/*-nightly.md` for 09-11 through 09-14, five days silent now, so nothing since the MCP server has met the real pipeline and Release is holding the tag. Escalated on 2026-09-12 (`needs-human/2026-09-12-nightly-has-not-run.md`, [#12](https://github.com/Nirmaypanchal/rapport/issues/12)); re-verified 2026-09-14, still open and still accurate. Not re-escalated per AGENTS.md (no duplicate escalations); **Notice when the nightly goes quiet**, in Now above, is the board's own fix for exactly this. _Size:_ —, blocked on the owner.
+- [ ] **The nightly has not run since 2026-09-10** — no `sprint/log/*-nightly.md` for 09-11 through 09-15, six days silent now, so nothing since the MCP server has met the real pipeline and Release is holding the tag. Escalated on 2026-09-12 (`needs-human/2026-09-12-nightly-has-not-run.md`, [#12](https://github.com/Nirmaypanchal/rapport/issues/12)); re-verified 2026-09-15, still open and still accurate, not re-escalated per AGENTS.md. The watchdog shipped today ([#18](https://github.com/Nirmaypanchal/rapport/pull/18)) and now carries this: it runs daily, and #12 carries its marker so it reports the *next* silence rather than filing a duplicate of this one, and closes #12 by itself when a log lands. Nothing for an agent to do here but wait for the Mac. _Size:_ —, blocked on the owner.
 
 ## Later (ideas)
 
@@ -109,6 +90,8 @@ Ordered. The Build agent takes the first unchecked item under **Now**. See [READ
 
 ## Done
 
+- [x] Fix `reddit_post.py`'s subreddit check, which rejected `rapport` itself, and the frontmatter value beside it (2026-09-15, [#17](https://github.com/Nirmaypanchal/rapport/pull/17))
+- [x] Notice when the nightly goes quiet: a daily watchdog that opens one issue after 48 silent hours and closes it on recovery (2026-09-15, [#18](https://github.com/Nirmaypanchal/rapport/pull/18))
 - [x] Import from DJI Mic, USB recorders, mic/Bluetooth, Voice Memos, Omi, Granola, Notion, folders, files (2026-09-08)
 - [x] On-device transcription, diarization, cross-recording speaker recognition, in-place corrections (2026-09-07)
 - [x] Local summaries, search, skip silences, exports (2026-09-08)

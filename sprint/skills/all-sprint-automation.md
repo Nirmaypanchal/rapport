@@ -1,4 +1,4 @@
-# The sprint's own automation (Last verified: 2026-09-13, retro week 37)
+# The sprint's own automation (Last verified: 2026-09-15, Build)
 
 How this project's `.github/workflows/` behave, and what has already gone wrong in them. Every agent should read this,
 not only Build: week 37's one real Community finding was a workflow bug spotted from the issue list, and Research and
@@ -31,6 +31,19 @@ Release both depend on these workflows doing what they claim.
   `sprint-merge` opening a PR starts a second run that is killed when the PR squash-merges three seconds later: zero
   jobs, nothing run, permanently red. The identical SHA is green on the `push` event. Four of week 37's 17 CI runs are
   these. Check the job count before believing a red run; there is a backlog item to stop creating them.
+- **The nightly's silence is watched** (`nightly-watchdog.yml` + `scripts/nightly_watchdog.py`, 2026-09-15). Daily: one
+  issue when the newest `sprint/log/*-nightly.md` is more than 48 hours old, closed again when a log lands. So an agent
+  no longer has to notice an absence by hand — but read what it decided before trusting it, because two of its choices
+  are not obvious: it counts **open** issues only (a silence that returns after a fix is news again, unlike a
+  needs-human file that waits), and [#12](https://github.com/Nirmaypanchal/rapport/issues/12) carries its
+  `<!-- nightly-watchdog -->` marker so the escalation already open is not duplicated.
+- **In a workflow, a file's mtime is the checkout time, not when it was written.** `actions/checkout` stamps every file
+  as it clones, so anything reasoning about how old a file is must read a date out of its name or its content. The
+  watchdog above would have reported a week-old log as seconds old.
+- **A script whose real job is irreversible (posting, filing, merging) needs a `--dry-run` and a way to point it at a
+  scratch folder**, or the only way to test it is to do the thing. `scripts/reddit_post.py` had neither, so the bug that
+  made every post to r/rapport impossible (#16) survived until a real post hit it; `--outbox DIR --dry-run` is now how
+  an outbox file is checked before it is pushed.
 - **`sprint-merge` still ends `gh pr create` with `|| true`**, so it can report success having opened and merged
   nothing — that is how the Actions-permission failure went unnoticed twice on 2026-09-09. The setting being on means
   the bug no longer fires, not that it is fixed. On the backlog as "Make `sprint-merge` fail loudly", with a note to
