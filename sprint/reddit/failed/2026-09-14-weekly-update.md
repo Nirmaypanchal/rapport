@@ -1,4 +1,5 @@
 ---
+error: Reddit credentials are not configured (REDDIT_* secrets)
 kind: post
 subreddit: rapport
 title: This week in Rapport: Ask your library, summaries by source, and an MCP server
