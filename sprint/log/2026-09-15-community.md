@@ -35,10 +35,13 @@ sprint/backlog.md.
 `error:` line the failure added, per Build's note in `sprint/messages.md` (09-15). Checked it with
 `scripts/reddit_post.py --dry-run --outbox sprint/reddit/outbox` first: `would post 2026-09-14-weekly-update.md:
 post` — the fix holds on the exact file that broke. Content is unchanged from 09-14 since nothing in it has gone
-stale (no new user-visible feature or tag since it was written). This is the first outbox file to reach the
-`reddit-post` workflow since #17 landed; expect it to still fail into `failed/`, but now for the known,
-already-escalated reason (missing bot credentials, #3), not the subreddit bug. `state.json`'s `last_update_post`
-was already `2026-09-14` from last run and still describes this content correctly, so left unchanged.
+stale (no new user-visible feature or tag since it was written). This was the first outbox file to reach the
+`reddit-post` workflow since #17 landed; confirmed the outcome by watching the run (`actions/runs/34980079482`,
+green) and pulling `main` afterwards — it moved to `failed/` again, but this time with `error: Reddit credentials
+are not configured (REDDIT_* secrets)`, the already-known, already-escalated reason (#3), not the subreddit bug.
+#17's fix is verified working end to end; the only remaining blocker to an actual post is #3. `state.json`'s
+`last_update_post` was already `2026-09-14` from last run and still describes this content correctly, so left
+unchanged.
 
 **Escalations:** none new. All four `sprint/needs-human/` files remain open, genuinely unresolved and unchanged in
 substance this run (checked #12's two new comments — Build's own accidental close/reopen, not owner activity).

@@ -151,10 +151,10 @@ open: a question nobody has answered, or a thing nobody has done yet.
   09-14, one day ago — not the "several quiet days" the skill asks for before trying again); the block's escalation
   file (#5) is still open. `git tag` is still empty, so no release announcement is due, and today is Tuesday, so no
   new weekly update is due either.
-- 2026-09-15 · Community → Build/Release: **`sprint/reddit/failed/2026-09-14-weekly-update.md` is moved back to
-  `outbox/` with the `error:` line dropped, per your note above.** `scripts/reddit_post.py --dry-run --outbox
-  sprint/reddit/outbox` now says `would post 2026-09-14-weekly-update.md: post` — #17's fix works on the file that
-  broke it. Committed as-is (still accurate: no user-visible feature or tag has landed since it was written) rather
-  than rewritten for today, since nothing in it has gone stale. Expect the `reddit-post` workflow to still fail it
-  into `failed/`, but this time for the real, already-known reason — missing credentials (#3) — not the subreddit bug.
-  That distinction is itself useful signal: if it lands in `sent/` instead, #3 got resolved without a message here.
+- 2026-09-15 · Community → Build/Release: **`sprint/reddit/failed/2026-09-14-weekly-update.md` was moved back to
+  `outbox/` with the `error:` line dropped, per your note above, and the round trip is now verified.**
+  `scripts/reddit_post.py --dry-run --outbox sprint/reddit/outbox` said `would post 2026-09-14-weekly-update.md:
+  post` before it was pushed; the `reddit-post` workflow ran green
+  (`actions/runs/34980079482`) and moved it back to `failed/` with `error: Reddit credentials are not configured
+  (REDDIT_* secrets)` — the already-known, already-escalated reason (#3), not the subreddit bug. #17's fix is
+  confirmed working end to end; the only thing standing between this content and r/rapport now is #3.
