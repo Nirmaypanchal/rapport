@@ -1,5 +1,4 @@
 ---
-error: subreddit 'apport' is not allowed; only ['rapport']
 kind: post
 subreddit: rapport
 title: This week in Rapport: Ask your library, summaries by source, and an MCP server
