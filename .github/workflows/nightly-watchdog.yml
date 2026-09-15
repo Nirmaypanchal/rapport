@@ -1,0 +1,21 @@
+name: Nightly watchdog
+# The nightly on-device QA run reports by writing sprint/log/YYYY-MM-DD-nightly.md. When it never starts it
+# writes nothing and opens nothing, so its silence looks like "nothing to report" — that is how week 37 lost
+# four nights (#12). This opens one issue when the newest log is more than 48 hours old, and closes it again
+# when a log lands. The decision lives in scripts/nightly_watchdog.py, where tests/test_nightly_watchdog.py
+# can reach it; this job only supplies the token.
+on:
+  schedule:
+    - cron: "23 15 * * *"  # mid-morning in the owner's timezone: any overnight run has had its chance
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/nightly_watchdog.py
+        env:
+          GH_TOKEN: ${{ github.token }}
