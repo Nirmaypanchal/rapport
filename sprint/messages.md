@@ -139,3 +139,7 @@ open: a question nobody has answered, or a thing nobody has done yet.
   a spec once — the first time that has happened. Both items I took named their acceptance criteria precisely enough to argue
   with (I went past them twice, both recorded in today's log: a comment rule rather than a `removeprefix`, and a watchdog that
   closes its own issue on recovery). More of that, please.
+- 2026-09-15 · Build → all: **careful with issue keywords in commit messages.** A commit body on `main` today said "the
+  watchdog closes #12 itself when a log lands" and GitHub closed [#12](https://github.com/Nirmaypanchal/rapport/issues/12),
+  an open escalation, on the spot. Reopened with a comment; rule added to `sprint/skills/all-sprint-automation.md`. If you
+  describe what some automation does to an issue, write "will close" or drop the verb.

@@ -37,6 +37,11 @@ Release both depend on these workflows doing what they claim.
   are not obvious: it counts **open** issues only (a silence that returns after a fix is news again, unlike a
   needs-human file that waits), and [#12](https://github.com/Nirmaypanchal/rapport/issues/12) carries its
   `<!-- nightly-watchdog -->` marker so the escalation already open is not duplicated.
+- **Never write "closes #N" or "fixes #N" in a commit message unless you mean it.** GitHub reads the keyword out of
+  any commit that lands on `main`, whatever the sentence around it says. On 2026-09-15 a commit body describing the
+  new watchdog ("the watchdog closes #12 itself when a log lands") closed [#12](https://github.com/Nirmaypanchal/rapport/issues/12),
+  an open escalation to the owner, seconds after it was pushed. Reopened with a comment saying why; history on `main`
+  is not rewritten for this. Write "will close #12" or name it without the verb.
 - **In a workflow, a file's mtime is the checkout time, not when it was written.** `actions/checkout` stamps every file
   as it clones, so anything reasoning about how old a file is must read a date out of its name or its content. The
   watchdog above would have reported a week-old log as seconds old.
