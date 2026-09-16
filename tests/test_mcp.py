@@ -158,6 +158,89 @@ def test_search_returns_summary_blocks_without_a_timestamp(library_with_two_reco
     assert "at" not in block and "start_sec" not in block and "speaker" not in block
 
 
+def _model(monkeypatch, answer="Alice and Bob decided to run the marathon in October [1].", seen=None):
+    """Put a local model behind `ask`: the provider it resolves and the text it writes."""
+    monkeypatch.setattr("rapport.ask.resolve_provider", lambda provider, model: ("ollama", model or "llama3.2"))
+
+    def chat(provider, model, system, user, **kw):
+        if seen is not None:
+            seen.update(provider=provider, model=model, system=system, user=user)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+    monkeypatch.setattr("rapport.ask.chat", chat)
+
+
+def test_ask_answers_from_the_library_and_shows_its_sources(library_with_two_recordings, monkeypatch):
+    seen = {}
+    _model(monkeypatch, seen=seen)
+    out = _call(library_with_two_recordings["db"], "ask", {"question": "What did we decide about the marathon?"})
+
+    assert out["answer"].startswith("Alice and Bob decided")
+    assert out["reason"] is None and out["error"] is None
+    assert out["model"] == {"provider": "ollama", "model": "llama3.2"}
+    assert out["count"] == len(out["sources"]) >= 1
+    assert [s["n"] for s in out["sources"]] == list(range(1, out["count"] + 1)), "the numbers the answer cites"
+    assert out["sources"][0]["cited"] is True and out["sources"][0]["recording_id"] == library_with_two_recordings["done"]
+    assert "Run the marathon in October." in seen["user"], "the model is given the excerpts, not the library"
+
+
+def test_ask_describes_a_moment_exactly_as_search_does(library_with_two_recordings, monkeypatch):
+    """One vocabulary for both tools: a client that learned `search` can read an `ask` source."""
+    _model(monkeypatch)
+    db = library_with_two_recordings["db"]
+    hit = _call(db, "search", {"query": "Who is booking the flights?"})["results"][0]
+    source = _call(db, "ask", {"question": "Who is booking the flights?"})["sources"][0]
+
+    assert set(source) - set(hit) == {"n", "cited"}, "an ask source is a search hit plus its citation number"
+    assert {k: source[k] for k in hit} == hit
+
+
+def test_ask_with_no_local_model_returns_the_excerpts_and_says_why(library_with_two_recordings):
+    """The scratch library has `summary_provider: off`, which is also a Mac with nothing installed."""
+    out = _call(library_with_two_recordings["db"], "ask", {"question": "What did we decide about the marathon?"})
+
+    assert out["answer"] is None and out["reason"] == "no_model" and out["model"] is None
+    assert out["sources"], "the excerpts are the answer when there is no model to write one"
+    assert "read them and answer from those" in out["note"]
+
+
+def test_ask_uses_the_model_this_library_is_configured_for(library_with_two_recordings, monkeypatch):
+    """Not `Library()`, which would rewrite the settings file this server is only reading."""
+    lib_root = library_with_two_recordings["db"].path.parent
+    settings = json.loads((lib_root / "settings.json").read_text())
+    settings.update(summary_provider="ollama", summary_model="qwen3:14b")
+    (lib_root / "settings.json").write_text(json.dumps(settings))
+    asked = {}
+    monkeypatch.setattr("rapport.ask.resolve_provider",
+                        lambda provider, model: asked.update(provider=provider, model=model) or ("ollama", model))
+    monkeypatch.setattr("rapport.ask.chat", lambda *a, **k: "In October [1].")
+
+    _call(library_with_two_recordings["db"], "ask", {"question": "When is the marathon?"})
+    assert asked == {"provider": "ollama", "model": "qwen3:14b"}
+
+
+def test_ask_that_matches_nothing_is_a_state_not_an_error(library_with_two_recordings, monkeypatch):
+    _model(monkeypatch)
+    out = _call(library_with_two_recordings["db"], "ask", {"question": "What about the submarine?"})
+    assert out["answer"] is None and out["sources"] == [] and out["reason"] == "no_matches" and out["note"]
+
+
+def test_ask_keeps_the_excerpts_when_the_model_breaks(library_with_two_recordings, monkeypatch):
+    _model(monkeypatch, answer=RuntimeError("connection refused"))
+    out = _call(library_with_two_recordings["db"], "ask", {"question": "What did we decide about the marathon?"})
+
+    assert out["answer"] is None and out["reason"] == "model_error"
+    assert "connection refused" in out["error"] and out["sources"]
+
+
+def test_ask_rejects_an_empty_question(db):
+    assert "question is required" in _failure(db, "ask")
+    assert "question is empty" in _failure(db, "ask", {"question": "  "})
+    assert "question must be str" in _failure(db, "ask", {"question": 7})
+
+
 def test_search_rejects_bad_arguments(db):
     assert "query is required" in _failure(db, "search")
     assert "query is empty" in _failure(db, "search", {"query": "   "})
@@ -296,12 +379,15 @@ def test_no_tool_writes_to_the_library(library_with_two_recordings):
     before = _dump(db)
 
     _call(db, "search", {"query": "marathon"})
+    _call(db, "ask", {"question": "What did we decide about the marathon?"})
     _call(db, "list_recordings")
     _call(db, "get_recording", {"recording_id": rid})
     _call(db, "get_transcript", {"recording_id": rid})
     _call(db, "get_summary", {"recording_id": rid})
     _call(db, "list_people")
 
+    assert set(mcp.HANDLERS) == {"search", "ask", "list_recordings", "get_recording", "get_transcript",
+                                 "get_summary", "list_people"}, "a new tool must be added to this test"
     assert _dump(db) == before
 
 

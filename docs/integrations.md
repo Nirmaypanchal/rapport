@@ -54,9 +54,15 @@ One thing to know before you connect a cloud assistant: what it reads, it sends 
 had pasted the transcript into the chat yourself. That is the only way words from your recordings can leave your Mac —
 see [Privacy](privacy.md#the-mcp-server).
 
+Two of the tools overlap on purpose. `search` hands the assistant the excerpts and lets it answer; `ask` has the model
+on *your* Mac write the answer first and returns that with the same excerpts. An assistant is a model already, so
+`search` is usually the faster and better of the two — `ask` is for when the answer should be written locally, or when
+the client would rather have one sentence than eight excerpts.
+
 | Tool | What the assistant gets |
 |---|---|
 | `search` | What matches a question: `moment` results (the turn with the turn before and after, the recording id and the timestamp) and `summary` results (a block of the summary Rapport wrote, which often states the outcome outright) |
+| `ask` | The same excerpts *plus* an answer written by the local model on your Mac, citing them by number — the Ask tab, as a tool. With no local model set up it returns the excerpts and says why there is no answer |
 | `list_recordings` | Recordings newest first, filtered by title or date |
 | `get_recording` | One recording: title, date, length, source, who speaks and for how long |
 | `get_transcript` | The transcript as speaker-labelled turns, or just the window you ask for |

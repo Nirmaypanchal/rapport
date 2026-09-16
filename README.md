@@ -20,7 +20,7 @@ Nothing is uploaded. No account. No subscription. MIT licensed.
   local model, with every claim linked to the moment it came from.
 - **Summaries with your own model.** Ollama if it's running, otherwise a small MLX model downloaded once. No API keys.
 - **Your recordings inside Claude or Cursor.** An MCP server, on your Mac, read-only: an assistant can search
-  your recordings and read transcripts, summaries and people, with no key and no network.
+  your recordings, ask them a question, and read transcripts, summaries and people, with no key and no network.
 - **Plain files you can see.** Originals, transcripts, people and settings live in one folder you can back up or delete.
 
 ![Rapport: a recording with speaker-labelled transcript, waveform and speaker lane](docs/screenshots/recording.png)
