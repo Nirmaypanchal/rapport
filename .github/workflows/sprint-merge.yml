@@ -9,7 +9,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  actions: read  # to see the CI run the pull request starts, before merging kills it
+  actions: write  # to read the CI run this pull request starts, and delete it when it never ran
 jobs:
   merge:
     if: startsWith(github.event.workflow_run.head_branch, 'sprint/') && github.event.workflow_run.event == 'push'
@@ -32,14 +32,14 @@ jobs:
             printf '%s\n\n---\nOpened automatically from `%s` by the sprint (see AGENTS.md). CI on the branch: **%s**.\n' "$body" "$BRANCH" "$RESULT" > /tmp/body.md
             gh pr create --head "$BRANCH" --base main --title "$title" --body-file /tmp/body.md --label sprint || true
           fi
-      - name: Let the pull request's own CI run settle
-        # Opening the pull request starts a CI run for a commit `push` already tested. Its jobs skip (see the
-        # condition in ci.yml), which takes about a second — but merging and deleting the branch in that
-        # second killed it instead, leaving a red run with zero jobs behind every auto-merge. So wait it out.
-        # The script never holds a merge: with no run, a broken `gh` or a run that keeps going, it says so
-        # and returns. See scripts/sprint_merge.py and tests/test_sprint_merge.py.
-        if: env.RESULT == 'success'
-        run: python3 scripts/sprint_merge.py wait-for-pr-ci --branch "$BRANCH" --sha "$SHA"
+      - name: Delete the CI run this pull request could never run
+        # Opening a pull request starts a CI run for a commit `push` already tested. Opened by a person it
+        # skips in a second (the condition in ci.yml); opened here it cannot run at all, because GitHub will
+        # not run a workflow for an event GITHUB_TOKEN created — it is filed `action_required` with zero
+        # jobs, and goes red when the merge below deletes the branch. That run says nothing by existing, so
+        # it goes. Only a completed, unsuccessful pull_request run for this commit *with no jobs at all* is
+        # ever deleted; anything that ran stays. See scripts/sprint_merge.py and tests/test_sprint_merge.py.
+        run: python3 scripts/sprint_merge.py prune-ghost-run --branch "$BRANCH" --sha "$SHA"
       - name: Merge when green
         if: env.RESULT == 'success'
         run: |

@@ -1,28 +1,36 @@
 #!/usr/bin/env python3
 """The decisions behind `.github/workflows/sprint-merge.yml`, where tests can reach them.
 
-    scripts/sprint_merge.py wait-for-pr-ci --branch sprint/foo --sha abc1234
-    scripts/sprint_merge.py wait-for-pr-ci --branch sprint/foo --sha abc1234 --dry-run
+    scripts/sprint_merge.py prune-ghost-run --branch sprint/foo --sha abc1234
+    scripts/sprint_merge.py prune-ghost-run --branch sprint/foo --sha abc1234 --dry-run
 
-Today it holds one decision: **when it is safe to squash-merge without killing a CI run**.
+Today it holds one decision: **what to do about the CI run the merge bot's own pull request leaves behind.**
 
-Every auto-merge used to leave a red run behind. `ci.yml` answers `pull_request` as well as `push` — it has
-to, because `push` never fires on this repository for a fork's branch — so the pull request the merge bot
-opens starts a second run for a commit that was already tested. Since #19 that run's jobs all skip, which
-takes about one second; but the merge bot opened its pull request and merged it three seconds later (#19:
-opened 03:12:12, merged 03:12:15), and the run was created in that same second and killed before a single
-job was evaluated. Zero jobs, nothing run, permanently red. No condition inside `ci.yml` can win that race,
-because the race is decided before any condition is read.
+Every auto-merge used to leave a red run in the history. `ci.yml` answers `pull_request` as well as `push` —
+it has to, because `push` never fires on this repository for a branch that lives in a fork — so opening a
+pull request starts a second run for a commit `push` already tested. Since #19 that run's jobs skip
+themselves, which takes about a second (verified on a pull request opened by hand: #20, run 57, `skipped`).
 
-So the fix is on this side: open the pull request, let its run reach a conclusion, *then* merge. One second
-of waiting, against a run history where red means something actually failed.
+But the merge bot's own pull requests never get that far, and it took three measurements to see why. The
+bot opens them with `GITHUB_TOKEN`, and GitHub will not run a workflow for an event that token created —
+the run is filed as **`action_required`**, blocked, with **zero jobs**, waiting for an approval that is
+never coming. It is not red yet. Deleting the head branch is what turns it red: #22's run sat at
+`action_required` for six seconds and went to `failure` the instant `gh pr merge --delete-branch` ran.
+
+So no condition in `ci.yml` and no amount of waiting can save that run: it was never allowed to start. What
+is left is to not keep the corpse. Before merging, this deletes that one run — and only that one:
+
+- it must be a `pull_request` run for **this exact commit** on this branch,
+- it must be **completed**, and not successful,
+- and it must have **zero jobs** — the proof that nothing ran. A run whose jobs merely skipped lists all
+  three of them (run 57 again), so a real, skipped run is never mistaken for a corpse.
 
 Two rules this follows:
 
-- **Never block a merge on it.** If no run appears, or one is still going after a few minutes, it merges
-  anyway and says so. A merge that does not happen is a worse problem than a run that goes red.
-- **Wait on the run for this exact commit.** A pull request that has been open since an earlier, red push
-  carries older runs that concluded long ago; they say nothing about the one this merge would kill.
+- **Never block a merge.** No run, a broken `gh`, a refused delete: each says so on stderr and returns. A
+  branch that does not merge is a worse problem than a run that goes red.
+- **Never delete anything that ran.** Every guard above has to hold, and what was deleted is printed into
+  the workflow log, which keeps the record the deleted run would not have carried anyway.
 """
 from __future__ import annotations
 
@@ -44,11 +52,15 @@ def for_sha(runs: list[dict], sha: str) -> list[dict]:
 
 
 def decide(runs: list[dict], waited: float, appear: int = APPEAR_SECONDS, settle: int = SETTLE_SECONDS) -> dict:
-    """`wait` or `go`, always with a reason. `runs` are already narrowed to this commit."""
+    """`wait` or `go`, always with a reason. `runs` are already narrowed to this commit.
+
+    A run blocked as `action_required` reports `status: completed`, which is what makes it safe to look at:
+    it is terminal, not pending. Nothing here decides what to do with it — that is `is_ghost`.
+    """
     if not runs:
         if waited < appear:
             return {"action": "wait", "why": f"no pull_request run yet after {waited:.0f}s"}
-        return {"action": "go", "why": f"no pull_request run appeared in {appear}s; there is none to kill"}
+        return {"action": "go", "why": f"no pull_request run appeared in {appear}s; there is nothing to prune"}
     unfinished = [r for r in runs if r.get("status") != "completed"]
     if not unfinished:
         states = ", ".join(sorted({str(r.get("conclusion")) for r in runs}))
@@ -56,10 +68,26 @@ def decide(runs: list[dict], waited: float, appear: int = APPEAR_SECONDS, settle
     if waited >= settle:
         return {
             "action": "go",
-            "why": f"{len(unfinished)} pull_request run(s) still going after {settle}s; merging anyway "
+            "why": f"{len(unfinished)} pull_request run(s) still going after {settle}s; going on "
                    "rather than holding the branch",
         }
     return {"action": "wait", "why": f"{len(unfinished)} pull_request run(s) still going after {waited:.0f}s"}
+
+
+def is_ghost(run: dict, jobs: int) -> bool:
+    """Is this a run that never executed anything, and so says nothing by existing?
+
+    Zero jobs is the load-bearing test. A run whose jobs were all skipped by a condition still lists every
+    one of them, so the only runs with none are those GitHub refused to start: the merge bot's own pull
+    request, filed `action_required` because `GITHUB_TOKEN` opened it, and turned red by the branch being
+    deleted under it. Anything that ran, or passed, is kept whatever else is true of it.
+    """
+    return (
+        run.get("event") == "pull_request"
+        and run.get("status") == "completed"
+        and run.get("conclusion") not in (None, "success")
+        and jobs == 0
+    )
 
 
 def fetch_runs(branch: str, sha: str) -> list[dict]:
@@ -74,9 +102,25 @@ def fetch_runs(branch: str, sha: str) -> list[dict]:
     return for_sha(runs, sha)
 
 
+def job_count(run_id: int) -> int:
+    """How many jobs that run actually has. Zero means GitHub never started it."""
+    out = subprocess.run(
+        ["gh", "api", f"repos/{{owner}}/{{repo}}/actions/runs/{run_id}/jobs?per_page=1"],
+        check=True, capture_output=True, text=True,
+    ).stdout.strip()
+    return int(json.loads(out).get("total_count", 0)) if out else 0
+
+
+def delete_run(run_id: int) -> None:
+    subprocess.run(
+        ["gh", "api", "-X", "DELETE", f"repos/{{owner}}/{{repo}}/actions/runs/{run_id}"],
+        check=True, capture_output=True, text=True,
+    )
+
+
 def wait_for_pr_ci(branch, sha, *, fetch=fetch_runs, sleep=_time.sleep, clock=_time.monotonic,
-                   appear=APPEAR_SECONDS, settle=SETTLE_SECONDS, poll=POLL_SECONDS) -> dict:
-    """Poll until it is safe to merge. Returns the `go` plan that ended the wait."""
+                   appear=APPEAR_SECONDS, settle=SETTLE_SECONDS, poll=POLL_SECONDS) -> tuple[dict, list[dict]]:
+    """Poll until every pull_request run for this commit is terminal. Returns the plan and those runs."""
     started = clock()
     while True:
         try:
@@ -86,33 +130,53 @@ def wait_for_pr_ci(branch, sha, *, fetch=fetch_runs, sleep=_time.sleep, clock=_t
             runs = []
         plan = decide(runs, clock() - started, appear, settle)
         if plan["action"] == "go":
-            return plan
+            return plan, runs
         print(f"waiting: {plan['why']}", file=sys.stderr)
         sleep(poll)
+
+
+def prune_ghost_runs(branch, sha, *, fetch=fetch_runs, jobs_of=job_count, delete=delete_run,
+                     dry_run: bool = False, **wait_kw) -> list[dict]:
+    """Delete the runs for this commit that never ran. Returns one line per run, kept or deleted."""
+    plan, runs = wait_for_pr_ci(branch, sha, fetch=fetch, **wait_kw)
+    print(plan["why"], file=sys.stderr)
+    out = []
+    for run in runs:
+        rid = run.get("id")
+        try:
+            jobs = jobs_of(rid)
+        except Exception as e:
+            out.append({"run": rid, "action": "kept", "why": f"could not count its jobs ({e})"})
+            continue
+        if not is_ghost(run, jobs):
+            out.append({"run": rid, "action": "kept",
+                        "why": f"{run.get('conclusion')} with {jobs} job(s): it ran, so it stays"})
+            continue
+        if dry_run:
+            out.append({"run": rid, "action": "would delete", "why": f"{run.get('conclusion')}, no jobs"})
+            continue
+        try:
+            delete(rid)
+            out.append({"run": rid, "action": "deleted", "why": f"{run.get('conclusion')}, no jobs, nothing ran"})
+        except Exception as e:  # a refused delete is a red run, not a failed merge
+            out.append({"run": rid, "action": "kept", "why": f"delete refused ({e})"})
+    return out
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="command", required=True)
-    wait = sub.add_parser("wait-for-pr-ci", help="wait until merging cannot kill the pull request's CI run")
-    wait.add_argument("--branch", required=True, help="the head branch of the pull request")
-    wait.add_argument("--sha", required=True, help="the commit the merge bot was handed")
-    wait.add_argument("--appear", type=int, default=APPEAR_SECONDS, help="seconds to wait for a run to show up")
-    wait.add_argument("--settle", type=int, default=SETTLE_SECONDS, help="seconds to wait for it to finish")
-    wait.add_argument("--dry-run", action="store_true", help="decide once on what exists now, wait for nothing")
+    prune = sub.add_parser("prune-ghost-run", help="delete the pull request's CI run if it never ran at all")
+    prune.add_argument("--branch", required=True, help="the head branch of the pull request")
+    prune.add_argument("--sha", required=True, help="the commit the merge bot was handed")
+    prune.add_argument("--appear", type=int, default=APPEAR_SECONDS, help="seconds to wait for a run to show up")
+    prune.add_argument("--settle", type=int, default=SETTLE_SECONDS, help="seconds to wait for it to finish")
+    prune.add_argument("--dry-run", action="store_true", help="say what would be deleted, delete nothing")
     args = ap.parse_args(argv)
 
-    if args.dry_run:
-        try:
-            runs = fetch_runs(args.branch, args.sha)
-        except Exception as e:
-            print(f"could not read the runs on {args.branch} ({e}); treating it as none", file=sys.stderr)
-            runs = []
-        plan = decide(runs, 0.0, args.appear, args.settle)
-        print(f"{plan['action']}: {plan['why']}")
-        return 0
-    plan = wait_for_pr_ci(args.branch, args.sha, appear=args.appear, settle=args.settle)
-    print(f"go: {plan['why']}")
+    for line in prune_ghost_runs(args.branch, args.sha, dry_run=args.dry_run,
+                                 appear=args.appear, settle=args.settle):
+        print(f"run {line['run']}: {line['action']} — {line['why']}")
     return 0
 
 
