@@ -2,6 +2,23 @@
 
 Newest first. One paragraph each: what, why, what it rules out.
 
+- **2026-09-16 · The merge deletes the one CI run it causes and that GitHub never runs.** `sprint-merge` opens its
+  pull request with `GITHUB_TOKEN`, and GitHub does not run workflows for events that token creates: the run is filed
+  `action_required` with zero jobs, and the squash-merge's branch deletion turns it red. Every auto-merge left one,
+  so for a week a red run in this repository's history meant nothing until an agent had counted its jobs. The
+  alternatives were each worse: dropping `ci.yml`'s `pull_request` trigger would leave every fork's pull request with
+  no CI at all (`push` never fires here for someone else's branch); a personal access token to open the pull requests
+  with is a credential the owner would have to create and rotate for a cosmetic gain; leaving the branch undeleted
+  trades a red run for a growing list of dead branches. So `scripts/sprint_merge.py prune-ghost-run` deletes that run
+  just before merging, under four conditions that must all hold — a `pull_request` run, for that exact commit,
+  completed and not successful, and **with zero jobs**, which is the proof nothing ran, since a run whose jobs were
+  skipped by a condition still lists every one of them. A run whose jobs cannot be counted is kept, a refused delete
+  is not a failed merge, and what was deleted is printed into the workflow log. Note what is *not* hidden by this: a
+  workflow that fails at startup for a real reason fails the same way on the `push` event, which this never touches,
+  so the signal survives. Rules out: deleting any run on a judgement about what it "probably" was, deleting on the
+  `push` side, and blocking a merge on any of it. Reverting means deleting one step from `sprint-merge.yml`; the
+  history it stopped collecting does not come back.
+
 - **2026-09-14 · A source is the place, and the `source` column stays the mechanism.** The Sources page names tiles by
   where a recording came from (`icloud`, `dropbox`, `googledrive`, plus a generic `folder`); the `recording.source`
   column names the *mechanism* Rapport used to get it (`folder`, `usb`, `microphone`, `file`, `voicememos`, …), which
