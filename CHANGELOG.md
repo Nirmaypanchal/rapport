@@ -22,9 +22,14 @@ All notable changes to Rapport. The format follows Keep a Changelog; versions fo
   `kind: "summary"`. Summaries already in your library are indexed the next time Rapport opens it.
 - **MCP server.** Claude, Cursor and any other MCP client can now search your recordings and read transcripts,
   summaries and people, on your Mac, with no key and no network: `rapport-core --mcp`, or
-  `uv run python -m rapport.mcp` from a checkout. Six read-only tools — `search`, `list_recordings`,
+  `uv run python -m rapport.mcp` from a checkout. Seven read-only tools — `search`, `ask`, `list_recordings`,
   `get_recording`, `get_transcript`, `get_summary`, `list_people`. Nothing an assistant does can change or delete
   anything; write-back comes later. Setup for Claude Desktop is in [docs/integrations.md](docs/integrations.md).
+- **An MCP client can ask, not only search.** The `ask` tool answers a question from your library the way the Ask
+  tab does: the same retrieval, then your own local model writes the answer and cites the excerpts by number. It is
+  there for when an answer written on your Mac is the point; `search` remains the faster way for an assistant to
+  read the excerpts and answer for itself. With no local model set up you get the excerpts and a `reason`, never an
+  error.
 
 ## [0.1.0] - 2026-09-09
 

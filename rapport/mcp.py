@@ -1,5 +1,6 @@
-"""Rapport as an MCP server: an assistant can search your recordings, read a transcript, read a summary and
-see who is in your library — all from this Mac, over stdio, without the app running and without a network.
+"""Rapport as an MCP server: an assistant can search your recordings, ask them a question, read a transcript,
+read a summary and see who is in your library — all from this Mac, over stdio, without the app running and
+without a network.
 
     python -m rapport.mcp                     # the default library
     python -m rapport.mcp --library ~/Rapport
@@ -14,8 +15,11 @@ machine learning it cannot avoid (see sprint/decisions.md).
 Slice one is **read-only**. Nothing here writes to the library, and no tool touches audio files, so the worst a
 confused client can do is read. Writing notes back is a later slice.
 
-Retrieval is not reinvented: `search` is the same FTS index, keyword extraction and excerpt assembly that the
-Ask feature uses (`rapport/ask.py`), returned in an MCP envelope instead of an HTTP one.
+Retrieval is not reinvented: `search` and `ask` are the same FTS index, keyword extraction and excerpt assembly
+the Ask feature uses (`rapport/ask.py`), returned in an MCP envelope instead of an HTTP one. `ask` goes one step
+further and has the local model write the answer, exactly as `POST /api/ask` does — worth having even though the
+client is itself a model, for a client that wants one sentence rather than eight excerpts, or wants the sentence
+written on this Mac. Neither reads audio, and a Mac with no local model is a state, not an error.
 """
 from __future__ import annotations
 
@@ -89,6 +93,24 @@ TOOLS: list[dict] = [
             "required": ["query"],
         },
         "annotations": {"title": "Search recordings", **READ_ONLY},
+    },
+    {
+        "name": "ask",
+        "description": (
+            "Ask a question about the user's recordings and get back a written answer with the excerpts it "
+            "rests on, each numbered and cited in the answer as [1], [2]. The answer is written by a model "
+            "running on this Mac, from those excerpts only. Prefer `search` when you would rather read the "
+            "excerpts and answer yourself — it is the same retrieval, without the wait for a local model. "
+            "Reach for this when a written answer from the user's own machine is the point, or when their "
+            "library is large and a first pass over it helps. A Mac with no local model set up is not an "
+            "error: the excerpts come back with `answer: null` and a `reason`."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"question": {"type": "string", "description": "The question, in plain words."}},
+            "required": ["question"],
+        },
+        "annotations": {"title": "Ask the library", **READ_ONLY},
     },
     {
         "name": "list_recordings",
@@ -210,6 +232,28 @@ def _speaker_names(db, rid: int) -> dict[str, str]:
     return out
 
 
+def _excerpt(p: dict) -> dict:
+    """One excerpt in this server's vocabulary, from a `Passage.to_json()`.
+
+    Shared by `search` and `ask` so the two describe a moment the same way. A summary block carries no
+    timestamp at all rather than a zero: there is no second to jump to, and `get_summary` reads the rest.
+    """
+    out = {
+        "kind": p["kind"],
+        "recording_id": p["recording_id"],
+        "title": p["title"],
+        "recorded_at": p["recorded_at"],
+    }
+    if p["kind"] == "summary":
+        out["heading"] = p.get("heading")
+    else:
+        out["at"] = ask.clock(p["start"])
+        out["start_sec"] = round(p["start"], 1)
+        out["speaker"] = p["speaker"]
+    out["excerpt"] = p["text"]
+    return out
+
+
 def tool_search(db, args: dict) -> dict:
     query = _arg(args, "query", str, required=True).strip()
     if not query:
@@ -221,35 +265,65 @@ def tool_search(db, args: dict) -> dict:
 
     terms = ask.keywords(query)
     found = ask.retrieve(db, terms, match=match, max_passages=limit)
-    results = []
-    for p in found:
-        if p.kind == "summary":
-            # A summary has no timestamp: `get_summary` is where to read the rest of it, not `get_transcript`.
-            results.append({
-                "kind": "summary",
-                "recording_id": p.recording_id,
-                "title": p.title,
-                "recorded_at": p.recorded_at,
-                "heading": p.heading,
-                "excerpt": p.text,
-            })
-        else:
-            results.append({
-                "kind": "moment",
-                "recording_id": p.recording_id,
-                "title": p.title,
-                "recorded_at": p.recorded_at,
-                "at": ask.clock(p.start),
-                "start_sec": round(p.start, 1),
-                "speaker": p.speaker,
-                "excerpt": p.text,
-            })
+    results = [_excerpt(p.to_json(i)) for i, p in enumerate(found, 1)]
     return {
         "query": query,
         "searched_for": terms,
         "count": len(results),
         "results": results,
         "note": None if results else "Nothing in the library matches those words.",
+    }
+
+
+# Why an answer is missing, said in a way a client can act on rather than a code it has to look up.
+ASK_NOTES = {
+    "no_matches": "Nothing in the library matches those words, so there is nothing to answer from.",
+    "no_model": "No local model is set up on this Mac, so Rapport wrote no answer. The excerpts are the "
+                "evidence it would have used — read them and answer from those.",
+    "model_error": "The local model could not be reached, so Rapport wrote no answer. The excerpts are the "
+                   "evidence it would have used — read them and answer from those.",
+    "empty_answer": "The local model returned nothing. The excerpts are the evidence — answer from those.",
+}
+
+
+def _summary_model(db) -> tuple[str, str | None]:
+    """The provider and model this library is configured to write summaries with.
+
+    Read straight from `settings.json` next to the database rather than through `Library`, which creates
+    folders and rewrites the file it reads: this server must not change a thing in a library it is only
+    serving. A library with no settings file, or one that cannot be read, falls back to the same defaults
+    the app itself starts from.
+    """
+    from .config import Settings
+
+    try:
+        s = Settings.from_json(json.loads((db.path.parent / "settings.json").read_text()))
+    except Exception:
+        s = Settings()
+    return s.summary_provider, s.summary_model or None
+
+
+def tool_ask(db, args: dict) -> dict:
+    """`search` with the local model's answer on top — the same call `/api/ask` makes.
+
+    Still read-only: it reads the index, then a local model on this Mac writes from what it read.
+    """
+    question = _arg(args, "question", str, required=True).strip()
+    if not question:
+        raise ToolError("question is empty")
+
+    provider, model = _summary_model(db)
+    out = ask.ask(db, question, provider, model)
+    sources = [dict(_excerpt(s), n=s["n"], cited=s.get("cited", True)) for s in out["sources"]]
+    return {
+        "question": out["question"],
+        "answer": out["answer"],
+        "sources": sources,
+        "count": len(sources),
+        "model": out["model"],
+        "reason": out["reason"],
+        "error": out["error"],
+        "note": ASK_NOTES.get(out["reason"] or ""),
     }
 
 
@@ -395,6 +469,7 @@ def tool_list_people(db, args: dict) -> dict:
 
 HANDLERS = {
     "search": tool_search,
+    "ask": tool_ask,
     "list_recordings": tool_list_recordings,
     "get_recording": tool_get_recording,
     "get_transcript": tool_get_transcript,
@@ -456,8 +531,10 @@ def handle(db, msg: Any) -> dict | None:
             "instructions": (
                 "These tools read one person's own audio library on this Mac: recordings, transcripts, summaries "
                 "and the people in them. Nothing here can change or delete anything. Use `search` to find the "
-                "moments that answer a question, then `get_transcript` for the surrounding words. Say what the "
-                "recordings actually say, cite the recording and the timestamp, and never fill a gap with a guess."
+                "moments that answer a question, then `get_transcript` for the surrounding words; `ask` is the "
+                "same search with an answer written by a model on this Mac, for when that is wanted instead. "
+                "Say what the recordings actually say, cite the recording and the timestamp, and never fill a "
+                "gap with a guess."
             ),
         })
     if method in ("notifications/initialized", "notifications/cancelled"):
