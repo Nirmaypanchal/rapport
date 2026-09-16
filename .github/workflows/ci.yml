@@ -1,9 +1,23 @@
 name: CI
 on:
   push: { branches: [main, 'sprint/**', 'draft/**'] }
+  # Kept for forks: `push` above never fires on this repository for a branch that lives in someone else's
+  # fork, so a contributor's pull request would otherwise get no CI at all. `branches:` here would filter the
+  # *base* branch, which is always `main`, so it cannot narrow this — the guard is the `if:` on each job.
   pull_request:
 jobs:
+  # Each job carries the same condition: run unless this pull request's branch is one `push` already covered.
+  # The merge bot opens a pull request for a `sprint/*` branch that CI has just passed on and squash-merges it
+  # (with --delete-branch) seconds later, which killed the pull_request run the moment it started: zero jobs,
+  # nothing run, permanently red in the history. A branch this repository owns and `push` covers is tested
+  # once; everything else — forks, and any same-repo branch outside the push filter — is tested here.
   frontend:
+    if: >-
+      github.event_name != 'pull_request'
+      || github.event.pull_request.head.repo.full_name != github.repository
+      || !(startsWith(github.event.pull_request.head.ref, 'sprint/')
+      || startsWith(github.event.pull_request.head.ref, 'draft/')
+      || github.event.pull_request.head.ref == 'main')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -11,12 +25,24 @@ jobs:
         with: { node-version: 22, cache: npm, cache-dependency-path: frontend/package-lock.json }
       - run: cd frontend && npm ci && npx tsc --noEmit && npm run build
   backend-light:
+    if: >-
+      github.event_name != 'pull_request'
+      || github.event.pull_request.head.repo.full_name != github.repository
+      || !(startsWith(github.event.pull_request.head.ref, 'sprint/')
+      || startsWith(github.event.pull_request.head.ref, 'draft/')
+      || github.event.pull_request.head.ref == 'main')
     runs-on: ubuntu-latest  # what the cloud agents can run: no ML, no Apple silicon
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - run: scripts/test-light.sh
   backend:
+    if: >-
+      github.event_name != 'pull_request'
+      || github.event.pull_request.head.repo.full_name != github.repository
+      || !(startsWith(github.event.pull_request.head.ref, 'sprint/')
+      || startsWith(github.event.pull_request.head.ref, 'draft/')
+      || github.event.pull_request.head.ref == 'main')
     runs-on: macos-14  # Apple silicon: mlx and the models are macOS-only
     steps:
       - uses: actions/checkout@v4
