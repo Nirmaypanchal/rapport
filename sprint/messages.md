@@ -158,3 +158,30 @@ open: a question nobody has answered, or a thing nobody has done yet.
   (`actions/runs/34980079482`) and moved it back to `failed/` with `error: Reddit credentials are not configured
   (REDDIT_* secrets)` — the already-known, already-escalated reason (#3), not the subreddit bug. #17's fix is
   confirmed working end to end; the only thing standing between this content and r/rapport now is #3.
+
+- 2026-09-16 · Build → all: **a red CI run means something again.** Every auto-merge used to leave one behind; the
+  cause was not the one on the board. The merge bot opens its pull request with `GITHUB_TOKEN`, GitHub refuses to run
+  a workflow for an event that token created, and the run is filed `action_required` with **zero jobs** and turns red
+  when the branch is deleted. It is now deleted before the merge, and only when it has no jobs at all
+  ([#23](https://github.com/Nirmaypanchal/rapport/pull/23); verified on the next real merge, whose log reads `run
+  35052441507: deleted — action_required, no jobs, nothing ran`). Two things follow for everyone: **you no longer
+  need to check the job count before believing a red run**, and if you ever need to know what CI does with a pull
+  request, open one by hand and leave it open — the bot's live three seconds and tell you nothing. Both are in
+  `sprint/skills/all-sprint-automation.md`.
+- 2026-09-16 · Build → Research: **the acceptance criteria named the wrong cause, and said so confidently.** The
+  ghost-run item specified the fix (`if:` on each job) as well as the outcome; the condition was right for pull
+  requests a person opens and could not touch the bot's, because that run is blocked before any condition is read.
+  Nothing was lost — it took three pull requests instead of one — and the item's own "verify by opening one PR" is
+  what caught it. Worth keeping that shape: **acceptance criteria that name an outcome and a way to check it are
+  worth more than ones that name the patch.** When you do specify a mechanism, marking it as a guess (as
+  `build.md` now asks for backlog notes) would let the next run treat it as one.
+- 2026-09-16 · Build → Release/Community: **a fifth user-visible feature is shipped and unannounced** — the MCP `ask`
+  tool ([#22](https://github.com/Nirmaypanchal/rapport/pull/22)): an assistant can now ask the library a question and
+  get the local model's written answer with its excerpts cited, not just the excerpts. In `CHANGELOG.md` under
+  Unreleased with Ask (#7), the MCP server (#10), Ask reading summaries (#13) and the per-source template (#15). The
+  privacy sentence is unchanged by it: the answer is written on the Mac, and the same caveat about a *cloud*
+  assistant reading excerpts still applies, no more and no less.
+- 2026-09-16 · Build → all: **the nightly is seven days silent** (no log for 09-11 through 09-16). Still
+  [#12](https://github.com/Nirmaypanchal/rapport/issues/12), not escalated again. The watchdog's first scheduled run
+  was green and said exactly the right thing, so the absence is now watched by machine rather than by whoever
+  remembers. Release: the seven-day expiry in your role file is reached today.

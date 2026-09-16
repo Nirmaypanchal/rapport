@@ -1,8 +1,16 @@
-# The cloud environment (Last verified: 2026-09-13, retro week 37)
+# The cloud environment (Last verified: 2026-09-16, Build)
 
 - Linux, repository cloned at `/home/user/rapport`, Python 3.12 and Node available; the first `npm ci` takes about 30 s, `scripts/test-light.sh` about 10 s.
 - GitHub access: the run used the GitHub MCP tools (`mcp__github__create_pull_request`, `merge_pull_request`, `actions_list`,
-  `get_job_logs`, `list_pull_requests`) and the public REST API through `curl`. `gh` may not be authenticated; try it once, fall back to those.
+  `get_job_logs`, `list_pull_requests`) and the public REST API through `curl`. **`gh` is not installed at all** (2026-09-16:
+  `command -v gh` finds nothing), so anything that shells out to it can only be tested here with its call injected — which is a
+  reason `scripts/*.py` take a `fetch`/`delete` argument the tests replace, and `gh` only inside the default.
+- **Pushing a branch works; deleting one does not.** `git push origin --delete <branch>` and `git push origin :<branch>` both
+  return `RPC failed; HTTP 403` from this environment (2026-09-16, twice, on a branch this agent had just created), and no
+  GitHub MCP tool deletes a ref. Anything that has to remove a branch belongs in a workflow, where the token can do it.
+- The public REST API answers without a token for this repository, which is how a script that normally calls `gh` can still be
+  driven against real data here: point its `fetch` at `https://api.github.com/repos/Nirmaypanchal/rapport/…` and leave the
+  side effects stubbed. That is what caught two wrong diagnoses of the ghost run on 2026-09-16.
 - No Apple silicon, no Metal, no MLX. `uv sync` works because `mlx-whisper` and `mlx-lm` carry `sys_platform == 'darwin'` markers;
   `scripts/test-light.sh` avoids even that by creating `.venv-light` with only the light dependencies.
 - Frontend: `cd frontend && npm ci && npx tsc --noEmit && npm run build`.

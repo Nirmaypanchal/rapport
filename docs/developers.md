@@ -18,7 +18,7 @@ rapport/                 Python backend
   speakers.py            voice embeddings, people matching, reset/re-match
   summarize.py           Ollama / MLX summaries, the templates, splitting a summary into citable blocks, `chat()`
   ask.py                 Ask your library: FTS retrieval over turns and summaries, excerpts, the prompt, citations
-  mcp.py                 MCP server over stdio (read-only): search, recordings, transcripts, summaries, people
+  mcp.py                 MCP server over stdio (read-only): search, ask, recordings, transcripts, summaries, people
   connectors.py          Granola, Omi, Notion (read-only)
   recorder.py            live recording via ffmpeg avfoundation
   voicememos.py          Apple Voice Memos database and files
@@ -86,8 +86,12 @@ rapport-core --mcp                                 # the same code, from the fro
   are checked against each other by a test. Handlers return a plain dict and raise `ToolError` for anything the
   caller got wrong — that comes back as a failed tool result the model can read, not a protocol error.
 - Retrieval is not duplicated: `search` is `rapport/ask.py`'s keyword extraction and `retrieve()` in an MCP
-  envelope. Fix retrieval there and both features improve. Its results carry a `kind`: a `moment` has a timestamp,
-  a `summary` block does not.
+  envelope, and `ask` is `ask.ask()` — the same call `POST /api/ask` makes — in that same envelope. Fix retrieval
+  there and every feature improves. Both tools describe an excerpt through one function (`_excerpt`), so a `kind`
+  means the same thing in either: a `moment` has a timestamp, a `summary` block does not. An `ask` source is that
+  same excerpt plus the number the answer cites it by.
+- A local model that is missing, off or broken is a **state, not an error**, here as in the HTTP API: `ask` returns
+  its excerpts with `answer: null`, a `reason` and a note telling the client to answer from them itself.
 - **Nothing but protocol may be written to stdout** (`print(..., file=sys.stderr)` for anything else), or the client
   will see a parse error and drop the connection.
 
