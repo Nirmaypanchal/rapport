@@ -181,6 +181,11 @@ Keep new tests free of ML so they run everywhere; the pipeline is covered by `sc
 Rapport is developed by a continuous, mostly autonomous product sprint. `AGENTS.md` has the rules, `sprint/` has the board and
 the logs. Branches named `sprint/*` are merged automatically when CI passes; use `draft/*` for anything that should wait for a person.
 
+CI runs once per commit, not twice. A branch in this repository that `push` covers (`main`, `sprint/**`, `draft/**`) is tested on
+the push, and the jobs skip themselves if a pull request opens for that same branch afterwards — otherwise every auto-merge left a
+second, doomed run behind it. A pull request from a fork, or from a branch outside that list, is tested by the `pull_request` run
+as usual. `tests/test_ci_workflow.py` evaluates that condition, so it is a decision with tests rather than a line of YAML.
+
 When an agent needs a human it writes a file in `sprint/needs-human/`, and `scripts/needs_human_issues.py` (run by the
 `Needs human` workflow on every push and every six hours) opens one issue per file, assigned to the owner. It recognises the
 issues it has already opened by a `<!-- needs-human-file: … -->` marker in the body, so a file is never filed twice however
