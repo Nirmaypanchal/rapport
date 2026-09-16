@@ -181,10 +181,19 @@ Keep new tests free of ML so they run everywhere; the pipeline is covered by `sc
 Rapport is developed by a continuous, mostly autonomous product sprint. `AGENTS.md` has the rules, `sprint/` has the board and
 the logs. Branches named `sprint/*` are merged automatically when CI passes; use `draft/*` for anything that should wait for a person.
 
-CI runs once per commit, not twice. A branch in this repository that `push` covers (`main`, `sprint/**`, `draft/**`) is tested on
-the push, and the jobs skip themselves if a pull request opens for that same branch afterwards — otherwise every auto-merge left a
-second, doomed run behind it. A pull request from a fork, or from a branch outside that list, is tested by the `pull_request` run
-as usual. `tests/test_ci_workflow.py` evaluates that condition, so it is a decision with tests rather than a line of YAML.
+CI runs once per commit, not twice, and a red run always means something failed. A branch in this repository that `push` covers
+(`main`, `sprint/**`, `draft/**`) is tested on the push; if a pull request is then opened for that same branch, `ci.yml`'s jobs
+skip themselves rather than test the commit again. A pull request from a fork, or from a branch outside that list, is tested by
+the `pull_request` run as usual — that trigger is the only CI a fork gets, since `push` never fires here for someone else's
+branch. `tests/test_ci_workflow.py` evaluates that condition against made-up events, so it is a decision with tests rather than a
+line of YAML.
+
+The merge bot's own pull requests are a case of their own, and the reason both of the above exist. It opens them with
+`GITHUB_TOKEN`, and GitHub does not run workflows for events that token creates: the run is filed `action_required` with no jobs
+at all, and turns red as soon as the squash-merge deletes the branch under it. It was never allowed to start, so nothing in
+`ci.yml` can rescue it — instead `scripts/sprint_merge.py prune-ghost-run` deletes that one run just before merging. It only ever
+deletes a completed, unsuccessful `pull_request` run for that exact commit **with zero jobs**; a run whose jobs were merely
+skipped lists all three of them, so anything that ran is kept.
 
 When an agent needs a human it writes a file in `sprint/needs-human/`, and `scripts/needs_human_issues.py` (run by the
 `Needs human` workflow on every push and every six hours) opens one issue per file, assigned to the owner. It recognises the
