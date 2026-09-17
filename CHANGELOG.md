@@ -15,6 +15,10 @@ All notable changes to Rapport. The format follows Keep a Changelog; versions fo
   retrieval picks the moments, the local model writes a few sentences and cites each one, and every citation jumps to
   the excerpt and opens the recording where the words were said. With no local model installed you still get the
   moments that match. `POST /api/ask`.
+- **Ask writes the answer where you can see it.** A large local model takes tens of seconds to think, and the panel
+  used to show a blinking dot for all of it. The answer now appears as it is written, a few words at a time. The
+  citations turn into links at the end, when the list of sources they point at is complete. `POST /api/ask` answers
+  newline-delimited JSON: a `delta` per piece, then the same body it always returned.
 - **Ask reads your summaries too.** What a meeting decided is usually written in its summary in one sentence, and
   often in words nobody said out loud — so summaries are now in the search index as well, block by block. Ask leads
   with up to three of them (one per recording) and fills the rest with the moments; a cited summary opens that

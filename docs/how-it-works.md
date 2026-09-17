@@ -94,6 +94,11 @@ your own recordings:
    few sentences and to cite each one as `[1]`, `[2]`. The model is told which excerpts are summaries, so it can say
    "the summary says" rather than put words in anyone's mouth.
 
+The answer appears as the model writes it, a few words at a time, rather than all at once after a long blink — a big
+model on a laptop takes tens of seconds, and that is a lot of nothing to look at. The citations stay plain text while
+it writes and become buttons at the end: which excerpt `[2]` is depends on the finished list of sources, and a link
+that might point at the wrong moment is worse than a number that waits.
+
 Every citation is a button: it jumps to the excerpt. A moment opens the recording a second before the words were said,
 so you can hear it for yourself; a summary has no second to jump to, so it opens that recording's Summary tab.
 Excerpts the answer did not use are still listed, dimmed.

@@ -213,3 +213,18 @@ def test_ask_streams_the_answer_line_by_line(library, db, monkeypatch):
 def test_ask_still_refuses_an_empty_question_with_a_status_code(library, db):
     """A 400 has to happen before the stream starts, or the client gets 200 and a body full of nothing."""
     assert _client(library, db).post("/api/ask", json={"q": "  "}).status_code == 400
+
+
+def test_a_delta_with_a_newline_in_it_stays_one_line(library, db, monkeypatch):
+    """Models write newlines — a bulleted answer is mostly newlines. If one reached the wire raw it would
+    split an event in two and the client would read half a JSON object."""
+    rid = db.insert_recording(sha256="7" * 64, original_name="d.wav", rel_path="audio/d.wav", status="done", title="Kickoff")
+    db.replace_segments(rid, [{"speaker": "SPEAKER_00", "start": 1, "end": 2, "text": "the deadline is in March"}])
+    monkeypatch.setattr("rapport.ask.resolve_provider", lambda *a, **k: ("ollama", "llama3"))
+    monkeypatch.setattr("rapport.ask.stream_chat", lambda *a, **k: iter(["- March [1]\n", "- and\nApril\n"]))
+
+    r = _client(library, db).post("/api/ask", json={"q": "When is the deadline?"})
+    events = ask_events(r)
+    assert len(events) == 3, "two deltas and the answer, however many newlines are inside them"
+    assert [e["delta"] for e in events[:-1]] == ["- March [1]\n", "- and\nApril\n"]
+    assert events[-1]["answer"] == "- March [1]\n- and\nApril"

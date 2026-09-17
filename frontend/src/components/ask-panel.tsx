@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { FileText, Sparkles } from "lucide-react";
-import { api, type AskAnswer, type AskSource } from "@/lib/api";
+import { askStream, type AskAnswer, type AskSource } from "@/lib/api";
 import { fmtDate, fmtTime } from "@/lib/format";
 import { speakerStyle } from "@/lib/speakers";
 import { SpeakerDot } from "@/components/avatar";
@@ -21,6 +21,9 @@ function Note({ children }: { children: React.ReactNode }) {
 export function AskPanel({ active }: { active: boolean }) {
   const [q, setQ] = useState("");
   const [asked, setAsked] = useState<AskAnswer | null>(null);
+  /** The answer so far, while the model is still writing it. Its citations stay plain text until the
+   *  sources arrive with the last line — a number that links nowhere yet is worse than a number. */
+  const [live, setLive] = useState("");
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const field = useRef<HTMLInputElement>(null);
@@ -31,9 +34,10 @@ export function AskPanel({ active }: { active: boolean }) {
     if (!text || busy) return;
     setBusy(true);
     setFailed(null);
-    try { setAsked(await api<AskAnswer>("/api/ask", { method: "POST", json: { q: text } })); }
+    setLive("");
+    try { setAsked(await askStream(text, (piece) => setLive((sofar) => sofar + piece))); }
     catch (e) { setFailed((e as Error).message); setAsked(null); }
-    finally { setBusy(false); }
+    finally { setBusy(false); setLive(""); }
   };
 
   const jump = (n: number) => document.getElementById(`ask-source-${n}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -57,9 +61,15 @@ export function AskPanel({ active }: { active: boolean }) {
         </div>
       )}
 
-      {busy && (
+      {busy && !live && (
         <div className="mt-4 flex items-center gap-3 rounded-lg border border-hairline bg-surface px-5 py-6 text-[13.5px] text-ink-2">
           <span className="blink size-2 rounded-full bg-signal" />Reading your transcripts…
+        </div>
+      )}
+
+      {busy && !!live && (
+        <div className="mt-4 rounded-lg border border-hairline bg-surface px-5 py-4">
+          <Markdown text={live} />
         </div>
       )}
 

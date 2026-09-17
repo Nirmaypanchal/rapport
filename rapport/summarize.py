@@ -16,7 +16,7 @@ import re
 import threading
 import urllib.error
 import urllib.request
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -273,18 +273,86 @@ def chat(provider: str, model: str, system: str, user: str, max_tokens: int = 90
 
 
 def _ollama_chat(model: str, system: str, user: str, timeout: float = 600) -> str:
-    body = json.dumps({
-        "model": model, "stream": False,
-        "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
-        "options": {"temperature": 0.2, "num_ctx": 16384},
-    }).encode()
-    req = urllib.request.Request(f"{OLLAMA}/api/chat", data=body, headers={"Content-Type": "application/json"})
+    req = urllib.request.Request(f"{OLLAMA}/api/chat", data=_ollama_body(model, system, user, False),
+                                 headers={"Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             data = json.load(r)
     except urllib.error.HTTPError as e:
         raise RuntimeError(f"Ollama error {e.code}: {e.read().decode(errors='ignore')[:200]}") from e
     return (data.get("message") or {}).get("content", "").strip()
+
+
+def stream_chat(provider: str, model: str, system: str, user: str,
+                max_tokens: int = 900, timeout: float = 600) -> Iterator[str]:
+    """The same turn as `chat()`, delivered in the pieces the model writes it in.
+
+    `chat()` is left alone: a summary is written in the worker and read when it is finished, so nothing is
+    gained there by streaming, and the one call that waits in front of a person — Ask — is the one that
+    needs this. Joining every piece of this gives exactly what `chat()` would have returned.
+    """
+    if provider == "ollama":
+        yield from _ollama_stream(model, system, user, timeout=timeout)
+    else:
+        yield from _mlx_stream(model, system, user, max_tokens=max_tokens)
+
+
+def _ollama_body(model: str, system: str, user: str, stream: bool) -> bytes:
+    return json.dumps({
+        "model": model, "stream": stream,
+        "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+        "options": {"temperature": 0.2, "num_ctx": 16384},
+    }).encode()
+
+
+def _ollama_stream(model: str, system: str, user: str, timeout: float = 600) -> Iterator[str]:
+    """Ollama answers a streamed `/api/chat` with one JSON object per line, the last one carrying `done`.
+
+    A line that cannot be read is skipped rather than ending the answer: a keep-alive blank, or a field
+    this does not know about, is not a reason to throw away the rest of what the model is writing.
+    """
+    req = urllib.request.Request(f"{OLLAMA}/api/chat", data=_ollama_body(model, system, user, True),
+                                 headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            for raw in r:
+                line = raw.decode("utf-8", "replace").strip() if isinstance(raw, bytes) else raw.strip()
+                if not line:
+                    continue
+                try:
+                    data = json.loads(line)
+                except ValueError:
+                    continue
+                if data.get("error"):
+                    raise RuntimeError(f"Ollama error: {str(data['error'])[:200]}")
+                piece = (data.get("message") or {}).get("content") or ""
+                if piece:
+                    yield piece
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"Ollama error {e.code}: {e.read().decode(errors='ignore')[:200]}") from e
+
+
+def _mlx_stream(model: str, system: str, user: str, max_tokens: int = 900) -> Iterator[str]:
+    """MLX generates token by token; `stream_generate` is the same call as `generate` without the wait.
+
+    The lock is held for the whole generation, as `_mlx_chat` holds it: one model, one answer at a time.
+    Newer `mlx_lm` yields a response object carrying `.text`; older ones yield the text itself, and this
+    reads both. **Untested here** — there is no Apple silicon in the cloud; the nightly on the owner's Mac
+    is what runs it for real.
+    """
+    from mlx_lm import load, stream_generate
+
+    with _mlx_lock:
+        if model not in _mlx_cache:
+            _mlx_cache.clear()
+            _mlx_cache[model] = load(model)
+        m, tok = _mlx_cache[model]
+        messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+        prompt = tok.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
+        for piece in stream_generate(m, tok, prompt=prompt, max_tokens=max_tokens):
+            text = getattr(piece, "text", piece)
+            if text:
+                yield text
 
 
 def _mlx_chat(model: str, system: str, user: str, max_tokens: int = 900) -> str:

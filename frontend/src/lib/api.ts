@@ -253,6 +253,60 @@ export async function api<T>(path: string, init?: RequestInit & { json?: unknown
 
 export const fetcher = <T,>(path: string) => api<T>(path);
 
+/** One line of `/api/ask`: a piece of the answer as the model writes it, or the finished answer itself. */
+export type AskEvent = { delta: string } | AskAnswer;
+
+/**
+ * Ask a question and watch the answer being written. `onDelta` is called with each piece; the promise
+ * resolves with the same body `/api/ask` used to return in one go, which is the only thing that carries
+ * `sources` — so a citation number cannot be resolved until it arrives.
+ *
+ * `api()` is not reused: it reads one JSON body, and this one comes a line at a time.
+ */
+export async function askStream(q: string, onDelta: (piece: string) => void): Promise<AskAnswer> {
+  const res = await fetch(API + "/api/ask", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}) },
+    body: JSON.stringify({ q }),
+  });
+  if (!res.ok) {
+    let msg = res.statusText;
+    try {
+      const data = await res.json();
+      msg = typeof data?.detail === "string" ? data.detail : JSON.stringify(data?.detail ?? data);
+    } catch {
+      /* keep statusText */
+    }
+    throw new ApiError(res.status, msg);
+  }
+  const reader = res.body?.getReader();
+  if (!reader) throw new ApiError(500, "This browser cannot read a streamed answer.");
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let answer: AskAnswer | null = null;
+  const take = (line: string) => {
+    if (!line.trim()) return;
+    const event = JSON.parse(line) as AskEvent;
+    if ("delta" in event) onDelta(event.delta);
+    else answer = event;
+  };
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let nl: number;
+    // A JSON object never spans two lines, so a newline is always the end of one event.
+    while ((nl = buffer.indexOf("\n")) >= 0) {
+      take(buffer.slice(0, nl));
+      buffer = buffer.slice(nl + 1);
+    }
+  }
+  take(buffer); // a last line the server did not end with a newline
+  if (!answer) throw new ApiError(500, "The answer stopped before it was finished.");
+  return answer;
+}
+
 export const urls = {
   audio: (id: number) => withToken(`${API}/api/recordings/${id}/audio`),
   original: (id: number) => withToken(`${API}/api/recordings/${id}/original`),
