@@ -1,10 +1,35 @@
 #!/usr/bin/env python3
 """The decisions behind `.github/workflows/sprint-merge.yml`, where tests can reach them.
 
+    scripts/sprint_merge.py open-pr        --branch sprint/foo --sha abc1234 --result success
     scripts/sprint_merge.py prune-ghost-run --branch sprint/foo --sha abc1234
-    scripts/sprint_merge.py prune-ghost-run --branch sprint/foo --sha abc1234 --dry-run
+    scripts/sprint_merge.py merge          --branch sprint/foo --sha abc1234 --result success
 
-Today it holds one decision: **what to do about the CI run the merge bot's own pull request leaves behind.**
+Each takes `--dry-run`, which decides everything and changes nothing.
+
+It holds two decisions. **Open and merge, or hold and say why** is below; **what to do about the CI run the
+merge bot's own pull request leaves behind** is further down.
+
+## Open, merge, hold — and never quietly do nothing
+
+This is the whole path a `sprint/*` branch takes into `main`, so a step that reports success having done
+nothing is the worst thing it can do. It did exactly that twice on 2026-09-09: the workflow ended its
+`gh pr create` with `|| true`, the repository setting "Allow GitHub Actions to create and approve pull
+requests" was off, `gh` printed *"GitHub Actions is not permitted to create or approve pull requests"* and
+exited non-zero — and the job went green having merged nothing. Nobody noticed until a person went looking
+for the pull request (`sprint/needs-human/done/2026-09-09-actions-cannot-open-prs.md`).
+
+So nothing here is allowed to fail quietly:
+
+- every `gh` call is checked, and a failure ends the step red with what `gh` said,
+- after opening a pull request it **asks again whether one exists**, because a create that "succeeded"
+  without leaving a pull request behind is the failure this is here to catch,
+- and reaching the merge with no pull request to merge is an error, not an early `exit 0`.
+
+The one thing that is not an error is a deliberate hold: a pull request labeled `needs-human` is left alone
+(AGENTS.md), and a branch whose CI failed gets a comment instead of a merge. Both say so on stdout.
+
+## The CI run the merge bot's own pull request leaves behind
 
 Every auto-merge used to leave a red run in the history. `ci.yml` answers `pull_request` as well as `push` —
 it has to, because `push` never fires on this repository for a branch that lives in a fork — so opening a
@@ -36,13 +61,167 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
+import tempfile
 import time as _time
 
 APPEAR_SECONDS = 90  # how long a run may take to show up at all before we stop expecting one
 SETTLE_SECONDS = 240  # how long we wait for a run that did show up (it skips in about a second)
 POLL_SECONDS = 5
+CONFIRM_ASKS = 3  # how many times the pull request we just opened is looked for before we call it missing
+CONFIRM_SECONDS = 3
+
+BASE = "main"
+PR_LABEL = "sprint"
+HOLD_LABEL = "needs-human"  # AGENTS.md: anything a human must see first is never merged by the bot
+
+PR_BODY = ("{body}\n\n---\nOpened automatically from `{branch}` by the sprint (see AGENTS.md). "
+           "CI on the branch: **{result}**.\n")
+FAILURE_COMMENT = "CI **{result}** on {sha}. Not merged. The next Build run should fix this or close the PR."
+MERGE_COMMENT = "Merged automatically: CI passed on {sha}."
+
+
+class Stopped(Exception):
+    """Something this step must not paper over. The message is printed and the job goes red.
+
+    Only ever raised where going on would mean reporting success having merged nothing — never for a
+    deliberate hold (`needs-human`, a red branch), which is a decision, not a failure.
+    """
+
+
+# --- open the pull request, or find the one that is already there ----------------------------------------
+
+
+def open_plan(prs: list[dict]) -> dict:
+    """`open` or `reuse`. A branch keeps its pull request across pushes, so most runs reuse one."""
+    if prs:
+        number = prs[0].get("number")
+        return {"action": "reuse", "number": number, "why": f"#{number} is already open for this branch"}
+    return {"action": "open", "why": "no open pull request for this branch yet"}
+
+
+def merge_plan(prs: list[dict], result: str) -> dict:
+    """`merge`, `hold`, `note` or `stop`, always with a reason.
+
+    Order matters: a red branch is commented on whatever its labels say, because the comment is how the
+    next Build run finds it. `stop` is the loud one — the pull request that was opened two steps ago has
+    to still be there, and if it is not, this run merged nothing and must say so in red.
+    """
+    if not prs:
+        return {"action": "stop",
+                "why": "no open pull request to merge; the step that opens one reported success"}
+    pr = prs[0]
+    number = pr.get("number")
+    labels = {(label.get("name") or "") for label in (pr.get("labels") or [])}
+    if result != "success":
+        return {"action": "note", "number": number, "why": f"CI {result}: #{number} is not merged"}
+    if HOLD_LABEL in labels:
+        return {"action": "hold", "number": number, "why": f"held: #{number} is labeled {HOLD_LABEL}"}
+    return {"action": "merge", "number": number, "why": f"CI passed: squash-merging #{number}"}
+
+
+def create_command(branch: str, title: str, body_file: str) -> list[str]:
+    return ["gh", "pr", "create", "--head", branch, "--base", BASE,
+            "--title", title, "--body-file", body_file, "--label", PR_LABEL]
+
+
+def merge_command(number: int, sha: str) -> list[str]:
+    return ["gh", "pr", "merge", str(number), "--squash", "--delete-branch",
+            "--body", MERGE_COMMENT.format(sha=sha)]
+
+
+def comment_command(number: int, body: str) -> list[str]:
+    return ["gh", "pr", "comment", str(number), "--body", body]
+
+
+def gh(argv: list[str]) -> None:
+    """Run a `gh` command and let a failure through. Nothing here is optional enough for `|| true`."""
+    subprocess.run(argv, check=True)
+
+
+def open_pull_requests(branch: str) -> list[dict]:
+    """The open pull requests whose head is this branch (GitHub allows one per head/base pair)."""
+    out = subprocess.run(
+        ["gh", "pr", "list", "--head", branch, "--state", "open", "--json", "number,labels"],
+        check=True, capture_output=True, text=True,
+    ).stdout.strip()
+    return json.loads(out) if out else []
+
+
+def commit_message(sha: str) -> tuple[str, str]:
+    """The commit's subject and body — the pull request's title and description, per AGENTS.md."""
+    def log(fmt: str) -> str:
+        return subprocess.run(["git", "log", "-1", f"--format={fmt}", sha],
+                              check=True, capture_output=True, text=True).stdout.strip()
+    return log("%s"), log("%b")
+
+
+def create_pull_request(branch: str, title: str, body: str, *, run=gh) -> None:
+    """`gh pr create`, with the body through a file so its length and quoting cannot bite."""
+    fd, tmp = tempfile.mkstemp(suffix=".md")
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(body)
+        run(create_command(branch, title, tmp))
+    finally:
+        os.unlink(tmp)
+
+
+def confirm_opened(branch: str, *, prs=open_pull_requests, sleep=_time.sleep, asks: int = 3) -> list[dict]:
+    """Ask again whether the pull request we just created is there — the check that would have caught
+    2026-09-09. Asked a few times because "it is not there" is the accusation being made, and a list that
+    has not caught up yet would be a red job for no reason; three quiet seconds are cheaper than that."""
+    for attempt in range(asks):
+        found = prs(branch)
+        if found:
+            return found
+        if attempt + 1 < asks:
+            print(f"no pull request on {branch} yet; asking again", file=sys.stderr)
+            sleep(CONFIRM_SECONDS)
+    return []
+
+
+def ensure_pull_request(branch: str, sha: str, result: str, *, prs=open_pull_requests,
+                        commit=commit_message, create=create_pull_request, sleep=_time.sleep,
+                        asks: int = CONFIRM_ASKS, dry_run: bool = False) -> dict:
+    """Make sure this branch has an open pull request, even when CI failed — a red branch with no pull
+    request is invisible. Returns what was done; raises `Stopped` if afterwards there is still none."""
+    plan = open_plan(prs(branch))
+    if plan["action"] == "reuse":
+        return plan
+    title, body = commit(sha)
+    if dry_run:
+        return {"action": "would open", "why": f"would open a pull request titled {title!r}"}
+    create(branch, title, PR_BODY.format(body=body, branch=branch, result=result))
+    after = confirm_opened(branch, prs=prs, sleep=sleep, asks=asks)
+    if not after:
+        raise Stopped(
+            f"`gh pr create` reported success but {branch} still has no open pull request. Nothing was "
+            "merged. Check that 'Allow GitHub Actions to create and approve pull requests' is on in the "
+            "repository settings (see sprint/needs-human/done/2026-09-09-actions-cannot-open-prs.md)."
+        )
+    number = after[0].get("number")
+    return {"action": "opened", "number": number, "why": f"opened #{number} from {branch}"}
+
+
+def merge_when_green(branch: str, sha: str, result: str, *, prs=open_pull_requests, run=gh,
+                     dry_run: bool = False) -> dict:
+    """Squash-merge the branch's pull request, or say exactly why it is not being merged."""
+    plan = merge_plan(prs(branch), result)
+    if plan["action"] == "stop":
+        raise Stopped(plan["why"])
+    if dry_run:
+        return {**plan, "action": f"would {plan['action']}"}
+    if plan["action"] == "note":
+        run(comment_command(plan["number"], FAILURE_COMMENT.format(result=result, sha=sha)))
+    elif plan["action"] == "merge":
+        run(merge_command(plan["number"], sha))
+    return plan
+
+
+# --- the CI run the merge bot's own pull request leaves behind --------------------------------------------
 
 
 def for_sha(runs: list[dict], sha: str) -> list[dict]:
@@ -166,17 +345,51 @@ def prune_ghost_runs(branch, sha, *, fetch=fetch_runs, jobs_of=job_count, delete
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="command", required=True)
-    prune = sub.add_parser("prune-ghost-run", help="delete the pull request's CI run if it never ran at all")
-    prune.add_argument("--branch", required=True, help="the head branch of the pull request")
-    prune.add_argument("--sha", required=True, help="the commit the merge bot was handed")
+
+    def command(name: str, help: str) -> argparse.ArgumentParser:
+        p = sub.add_parser(name, help=help)
+        p.add_argument("--branch", required=True, help="the head branch of the pull request")
+        p.add_argument("--sha", required=True, help="the commit the merge bot was handed")
+        p.add_argument("--dry-run", action="store_true", help="decide everything, change nothing")
+        return p
+
+    opener = command("open-pr", "open the branch's pull request unless one is already open")
+    opener.add_argument("--result", required=True, help="CI's conclusion on the branch, for the body")
+    prune = command("prune-ghost-run", "delete the pull request's CI run if it never ran at all")
     prune.add_argument("--appear", type=int, default=APPEAR_SECONDS, help="seconds to wait for a run to show up")
     prune.add_argument("--settle", type=int, default=SETTLE_SECONDS, help="seconds to wait for it to finish")
-    prune.add_argument("--dry-run", action="store_true", help="say what would be deleted, delete nothing")
+    merger = command("merge", "squash-merge the pull request, or say why it is being held")
+    merger.add_argument("--result", required=True, help="CI's conclusion on the branch; only success merges")
     args = ap.parse_args(argv)
 
-    for line in prune_ghost_runs(args.branch, args.sha, dry_run=args.dry_run,
-                                 appear=args.appear, settle=args.settle):
-        print(f"run {line['run']}: {line['action']} — {line['why']}")
+    if args.command == "prune-ghost-run":
+        # Nothing in here may hold a merge, so it never raises: every path returns a line, kept or deleted.
+        for line in prune_ghost_runs(args.branch, args.sha, dry_run=args.dry_run,
+                                     appear=args.appear, settle=args.settle):
+            print(f"run {line['run']}: {line['action']} — {line['why']}")
+        return 0
+
+    try:
+        # The seams are passed rather than defaulted so that everything reaching GitHub is named in one
+        # place — and so a test can replace them here, on the path the workflow actually takes.
+        if args.command == "open-pr":
+            line = ensure_pull_request(args.branch, args.sha, args.result, dry_run=args.dry_run,
+                                       prs=open_pull_requests, commit=commit_message,
+                                       create=create_pull_request)
+        else:
+            line = merge_when_green(args.branch, args.sha, args.result, dry_run=args.dry_run,
+                                    prs=open_pull_requests, run=gh)
+    except Stopped as e:
+        print(f"sprint-merge stopped: {e}", file=sys.stderr)
+        return 1
+    except subprocess.CalledProcessError as e:
+        # The `|| true` this replaced swallowed exactly this, twice, and reported success.
+        print(f"sprint-merge stopped: {' '.join(e.cmd)} exited {e.returncode}", file=sys.stderr)
+        for stream in (e.stdout, e.stderr):
+            if stream:
+                print(stream, file=sys.stderr)
+        return 1
+    print(f"{line['action']}: {line['why']}")
     return 0
 
 

@@ -185,6 +185,18 @@ Keep new tests free of ML so they run everywhere; the pipeline is covered by `sc
 Rapport is developed by a continuous, mostly autonomous product sprint. `AGENTS.md` has the rules, `sprint/` has the board and
 the logs. Branches named `sprint/*` are merged automatically when CI passes; use `draft/*` for anything that should wait for a person.
 
+`sprint-merge.yml` is three calls to `scripts/sprint_merge.py` — `open-pr`, `prune-ghost-run`, `merge` — and no shell logic, so
+every decision it makes has tests (`tests/test_sprint_merge.py`). It opens the pull request if the branch has none, using the
+commit's first line as the title and its body as the description; then, when CI passed, it squash-merges, unless the pull request
+is labeled `needs-human`, which holds it for a person. A branch whose CI failed keeps its pull request and gets a comment saying
+so. Each subcommand takes `--dry-run`.
+
+None of those steps may fail quietly. The workflow used to end `gh pr create` with `|| true`, and on 2026-09-09, with "Allow
+GitHub Actions to create and approve pull requests" turned off in the repository settings, it twice reported success having
+opened and merged nothing. So now every `gh` call is checked, opening a pull request is followed by asking whether one actually
+exists, and reaching the merge with nothing to merge fails the job. The one exception is the run-pruning below, which may never
+be what stops a branch merging.
+
 CI runs once per commit, not twice, and a red run always means something failed. A branch in this repository that `push` covers
 (`main`, `sprint/**`, `draft/**`) is tested on the push; if a pull request is then opened for that same branch, `ci.yml`'s jobs
 skip themselves rather than test the commit again. A pull request from a fork, or from a branch outside that list, is tested by
