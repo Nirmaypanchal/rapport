@@ -1,17 +1,27 @@
-"""Guards for scripts/sprint_merge.py, which cleans up after Sprint merge's own pull request.
+"""Guards for scripts/sprint_merge.py, which opens, merges and cleans up after Sprint merge's pull request.
 
-Every auto-merge left a red CI run behind. The merge bot opens its pull request with `GITHUB_TOKEN`, and
-GitHub will not run a workflow for an event that token created: the run is filed `action_required` with zero
-jobs and goes red the moment `gh pr merge --delete-branch` removes the branch under it (#22: blocked at
-03:27:54, red at 03:28:01). Nothing in `ci.yml` can rescue a run that was never allowed to start, so the
-merge deletes it instead.
+Two things it must never do, each with its own history.
 
-Two things must not regress. **Nothing that ran may ever be deleted** — a run whose jobs were all skipped by
-a condition still lists all three of them (#20's run 57), so zero jobs is what separates a corpse from a
-real run. And **none of this may hold a merge**: no run, a broken `gh`, a refused delete, a run that keeps
-going — every path returns and lets the merge happen.
+**It must never report success having merged nothing.** The workflow used to end `gh pr create` with
+`|| true`. On 2026-09-09 "Allow GitHub Actions to create and approve pull requests" was off, `gh` said so and
+exited non-zero, `|| true` ate it, and the job went green twice with no pull request anywhere
+(`sprint/needs-human/done/2026-09-09-actions-cannot-open-prs.md`). So: every `gh` call is checked, opening a
+pull request is followed by asking whether one now exists, and arriving at the merge with nothing to merge is
+an error. A hold is different from a failure and stays quiet-but-spoken: `needs-human` is never merged, a red
+branch gets a comment.
+
+**It must never delete a CI run that ran.** Every auto-merge left a red CI run behind. The merge bot opens
+its pull request with `GITHUB_TOKEN`, and GitHub will not run a workflow for an event that token created:
+the run is filed `action_required` with zero jobs and goes red the moment `gh pr merge --delete-branch`
+removes the branch under it (#22: blocked at 03:27:54, red at 03:28:01). Nothing in `ci.yml` can rescue a
+run that was never allowed to start, so the merge deletes it instead. A run whose jobs were all skipped by a
+condition still lists all three of them (#20's run 57), so zero jobs separates a corpse from a real run.
+And **none of that may hold a merge**: no run, a broken `gh`, a refused delete, a run that keeps going —
+every path returns and lets the merge happen. (That is the one part of this script allowed to swallow an
+error, and only because the worst case is the red run we already had.)
 """
 import importlib.util
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -39,6 +49,201 @@ def run(status="completed", conclusion="skipped", sha=SHA, event="pull_request",
 def ghost(id=101):
     """What the merge bot's own pull request leaves: blocked before it started, nothing run."""
     return run(status="completed", conclusion="action_required", id=id)
+
+
+def pr(number=7, labels=()):
+    """One entry as `gh pr list --json number,labels` gives it."""
+    return {"number": number, "labels": [{"name": n} for n in labels]}
+
+
+class Gh:
+    """A `gh` that records what it was asked to do, and can be told to fail like the real one."""
+
+    def __init__(self, fail_on=None):
+        self.calls = []
+        self.fail_on = fail_on
+
+    def __call__(self, argv):
+        self.calls.append(argv)
+        if self.fail_on and self.fail_on in argv:
+            raise subprocess.CalledProcessError(1, argv, stderr="GitHub Actions is not permitted to …")
+
+    def did(self, verb):
+        return [c for c in self.calls if len(c) > 2 and c[2] == verb]
+
+
+# --- opening the pull request: the failure that went unnoticed twice ---------------------------------------
+
+
+def test_a_branch_with_no_pull_request_gets_one():
+    assert sm.open_plan([])["action"] == "open"
+
+
+def test_a_branch_that_already_has_one_reuses_it():
+    """A pull request outlives the pushes to its branch; only the first push of a branch opens one."""
+    plan = sm.open_plan([pr(number=31)])
+    assert plan == {"action": "reuse", "number": 31, "why": "#31 is already open for this branch"}
+
+
+def test_opening_uses_the_commit_as_the_title_and_body():
+    """AGENTS.md: the commit's first line is the PR title, its body the description."""
+    gh = Gh()
+    sm.ensure_pull_request("sprint/x", SHA, "success", prs=lambda b: [] if not gh.calls else [pr()],
+                           commit=lambda s: ("Ship the thing", "Why it was shipped."),
+                           create=lambda b, t, body: gh(["gh", "pr", "create", b, t, body]))
+    _, _, _, branch, title, body = gh.calls[0]
+    assert (branch, title) == ("sprint/x", "Ship the thing")
+    assert "Why it was shipped." in body and "sprint/x" in body and "**success**" in body
+
+
+def test_a_red_branch_still_gets_a_pull_request():
+    """Otherwise a failure nobody opened a pull request for is a failure nobody can see."""
+    opened = []
+    sm.ensure_pull_request("sprint/x", SHA, "failure", prs=lambda b: [pr()] if opened else [],
+                           commit=lambda s: ("Broken", ""),
+                           create=lambda b, t, body: opened.append(body))
+    assert opened and "**failure**" in opened[0]
+
+
+def test_a_create_that_leaves_no_pull_request_is_an_error():
+    """The 2026-09-09 shape: the step "succeeds" and there is nothing to merge. This is what `|| true` hid."""
+    asked = []
+    with pytest.raises(sm.Stopped) as e:
+        sm.ensure_pull_request("sprint/x", SHA, "success", prs=lambda b: asked.append(b) or [],
+                               commit=lambda s: ("t", "b"), create=lambda b, t, body: None,
+                               sleep=lambda s: None)
+    assert "Allow GitHub Actions" in str(e.value), "the message has to name the setting that was off"
+    assert len(asked) > 2, "it asks more than once before calling a pull request missing"
+
+
+def test_a_pull_request_that_shows_up_a_moment_later_is_not_a_failure():
+    """The list is asked again rather than once: a red job for a pull request that does exist would be a
+    worse lie than the one this whole change is about."""
+    answers = [[], [], [pr(number=9)]]
+    plan = sm.ensure_pull_request("sprint/x", SHA, "success", prs=lambda b: answers.pop(0),
+                                  commit=lambda s: ("t", "b"), create=lambda b, t, body: None,
+                                  sleep=lambda s: None)
+    assert plan == {"action": "opened", "number": 9, "why": "opened #9 from sprint/x"}
+
+
+def test_a_failing_create_is_not_swallowed():
+    gh = Gh(fail_on="create")
+    with pytest.raises(subprocess.CalledProcessError):
+        sm.ensure_pull_request("sprint/x", SHA, "success", prs=lambda b: [], commit=lambda s: ("t", "b"),
+                               create=lambda b, t, body: gh(["gh", "pr", "create"]))
+
+
+def test_a_dry_run_opens_nothing():
+    gh = Gh()
+    plan = sm.ensure_pull_request("sprint/x", SHA, "success", prs=lambda b: [], commit=lambda s: ("t", "b"),
+                                  create=lambda b, t, body: gh(["gh", "pr", "create"]), dry_run=True)
+    assert plan["action"] == "would open" and gh.calls == []
+
+
+# --- merging, holding, or saying why not -------------------------------------------------------------------
+
+
+def test_a_green_branch_is_merged():
+    gh = Gh()
+    plan = sm.merge_when_green("sprint/x", SHA, "success", prs=lambda b: [pr(number=31)], run=gh)
+    assert plan["action"] == "merge"
+    assert gh.did("merge")[0] == ["gh", "pr", "merge", "31", "--squash", "--delete-branch",
+                                  "--body", f"Merged automatically: CI passed on {SHA}."]
+
+
+def test_a_needs_human_pull_request_is_held_not_merged():
+    """AGENTS.md: anything a human must see first never merges by itself."""
+    gh = Gh()
+    plan = sm.merge_when_green("sprint/x", SHA, "success", prs=lambda b: [pr(labels=["sprint", "needs-human"])],
+                               run=gh)
+    assert plan["action"] == "hold" and gh.calls == []
+    assert "needs-human" in plan["why"], "a hold has to say what held it"
+
+
+def test_a_red_branch_is_commented_on_and_not_merged():
+    gh = Gh()
+    plan = sm.merge_when_green("sprint/x", SHA, "failure", prs=lambda b: [pr(number=31)], run=gh)
+    assert plan["action"] == "note" and gh.did("merge") == []
+    body = gh.did("comment")[0][-1]
+    assert "failure" in body and SHA in body and "next Build run" in body
+
+
+def test_a_red_branch_is_commented_on_even_when_it_is_held():
+    """The comment is how the next Build run finds a red branch; a label must not hide it."""
+    gh = Gh()
+    plan = sm.merge_when_green("sprint/x", SHA, "failure", prs=lambda b: [pr(labels=["needs-human"])], run=gh)
+    assert plan["action"] == "note" and gh.did("comment")
+
+
+@pytest.mark.parametrize("result", ["failure", "cancelled", "timed_out", "startup_failure", "neutral", ""])
+def test_nothing_but_success_ever_merges(result):
+    gh = Gh()
+    sm.merge_when_green("sprint/x", SHA, result, prs=lambda b: [pr()], run=gh)
+    assert gh.did("merge") == []
+
+
+def test_reaching_the_merge_with_no_pull_request_is_an_error():
+    """Two steps earlier one was opened or found. If it is gone now, this run merged nothing: say so."""
+    gh = Gh()
+    with pytest.raises(sm.Stopped):
+        sm.merge_when_green("sprint/x", SHA, "success", prs=lambda b: [], run=gh)
+    assert gh.calls == []
+
+
+def test_a_failing_merge_is_not_swallowed():
+    gh = Gh(fail_on="merge")
+    with pytest.raises(subprocess.CalledProcessError):
+        sm.merge_when_green("sprint/x", SHA, "success", prs=lambda b: [pr()], run=gh)
+
+
+def test_a_dry_run_merges_nothing():
+    gh = Gh()
+    plan = sm.merge_when_green("sprint/x", SHA, "success", prs=lambda b: [pr()], run=gh, dry_run=True)
+    assert plan["action"] == "would merge" and gh.calls == []
+
+
+def test_every_state_of_the_world_is_merge_hold_note_or_stop():
+    for prs in ([], [pr()], [pr(labels=["needs-human"])]):
+        for result in ("success", "failure", None):
+            plan = sm.merge_plan(prs, result)
+            assert plan["action"] in ("merge", "hold", "note", "stop") and plan["why"]
+
+
+# --- the command line the workflow actually calls -----------------------------------------------------------
+
+
+def test_the_script_exits_non_zero_when_nothing_could_be_merged(monkeypatch, capsys):
+    """The workflow has no `|| true` any more, so this exit code is what turns the job red."""
+    monkeypatch.setattr(sm, "open_pull_requests", lambda b: [])
+    assert sm.main(["merge", "--branch", "sprint/x", "--sha", SHA, "--result", "success"]) == 1
+    assert "sprint-merge stopped" in capsys.readouterr().err
+
+
+def test_the_script_exits_non_zero_when_gh_fails(monkeypatch, capsys):
+    def boom(argv):
+        raise subprocess.CalledProcessError(1, argv, stderr="GitHub Actions is not permitted …")
+
+    monkeypatch.setattr(sm, "open_pull_requests", lambda b: [pr()])
+    monkeypatch.setattr(sm, "gh", boom)
+    assert sm.main(["merge", "--branch", "sprint/x", "--sha", SHA, "--result", "failure"]) == 1
+    assert "not permitted" in capsys.readouterr().err, "what gh said has to reach the log"
+
+
+def test_the_script_exits_zero_on_a_hold(monkeypatch, capsys):
+    """A hold is a decision, not a failure: green job, and the reason on stdout."""
+    monkeypatch.setattr(sm, "open_pull_requests", lambda b: [pr(labels=["needs-human"])])
+    assert sm.main(["merge", "--branch", "sprint/x", "--sha", SHA, "--result", "success"]) == 0
+    assert "held" in capsys.readouterr().out
+
+
+def test_pruning_a_run_never_fails_the_job(monkeypatch):
+    """Even with `gh` gone: the prune step must not be what stops a branch merging. `--appear 0` is how
+    this returns without ever sleeping, so the test is as fast as the others."""
+    def no_gh(*a, **k):
+        raise FileNotFoundError("gh: command not found")
+
+    monkeypatch.setattr(sm.subprocess, "run", no_gh)  # the real `fetch_runs`, with nothing to call
+    assert sm.main(["prune-ghost-run", "--branch", "sprint/x", "--sha", SHA, "--appear", "0"]) == 0
 
 
 # --- which runs count ------------------------------------------------------------------------------------
@@ -229,12 +434,40 @@ def test_the_run_that_ends_the_wait_is_not_slept_on_again():
 # --- the workflow calls it, before it merges ---------------------------------------------------------------
 
 
-def test_the_workflow_prunes_before_it_merges():
-    text = WORKFLOW.read_text()
-    prune = text.find("scripts/sprint_merge.py prune-ghost-run")
-    merge = text.find("gh pr merge")
-    assert prune != -1, "the workflow does not call the script, so the ghost comes back"
-    assert merge != -1 and prune < merge, "after the merge the branch is gone and so is the run's context"
+def workflow() -> str:
+    """The workflow without its comments — which describe `|| true` and `if:` at length, and would
+    otherwise answer the questions the guards below are asking of the steps themselves."""
+    return "\n".join(l for l in WORKFLOW.read_text().splitlines() if not l.lstrip().startswith("#"))
+
+
+def steps() -> list[str]:
+    """The subcommands the workflow calls, in the order it calls them."""
+    text = workflow()
+    found = [(text.find(f"sprint_merge.py {c}"), c) for c in ("open-pr", "prune-ghost-run", "merge")]
+    missing = [c for at, c in found if at == -1]
+    assert not missing, f"the workflow no longer calls: {missing}"
+    return [c for _, c in sorted(found)]
+
+
+def test_the_workflow_opens_then_prunes_then_merges():
+    """Order is load-bearing: there is nothing to prune before the pull request exists, and after the
+    merge the branch is gone and so is the run's context."""
+    assert steps() == ["open-pr", "prune-ghost-run", "merge"]
+
+
+def test_the_workflow_swallows_nothing():
+    """The regression this item exists to stop: `gh pr create … || true` reported success having opened
+    and merged nothing, twice, on 2026-09-09. Nothing in this workflow may end that way again."""
+    text = workflow()
+    assert "|| true" not in text, "a step that cannot fail cannot tell you the merge bot stopped working"
+    assert "exit 0" not in text, "an early exit hides the same thing `|| true` did"
+
+
+def test_the_merge_step_has_no_condition_on_it():
+    """Splitting merge and comment across two `if:`-ed steps is how a run could satisfy neither and still
+    go green. One step now decides, and it always decides something."""
+    after = workflow().split("sprint_merge.py merge")[0].rsplit("- name:", 1)[-1]
+    assert "if:" not in after, "the merge step must run for every conclusion and decide in the script"
 
 
 def test_the_workflow_may_read_and_delete_the_runs():
@@ -245,5 +478,8 @@ def test_the_workflow_may_read_and_delete_the_runs():
 
 
 def test_the_decision_is_not_inlined_in_the_yaml():
+    """Logic in a workflow is untested logic (sprint/skills/all-sprint-automation.md)."""
     text = WORKFLOW.read_text()
     assert "workflow_runs" not in text, "reading the runs belongs in the script, where these tests are"
+    for shell in ("gh pr create", "gh pr merge", "gh pr comment", "gh pr list", "--jq"):
+        assert shell not in text, f"`{shell}` is back in the YAML, where no test can reach it"

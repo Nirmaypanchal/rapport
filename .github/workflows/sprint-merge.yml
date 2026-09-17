@@ -23,15 +23,11 @@ jobs:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
       - name: Open the pull request if needed
-        run: |
-          set -e
-          n=$(gh pr list --head "$BRANCH" --state open --json number --jq 'length')
-          if [ "$n" = "0" ]; then
-            title=$(git log -1 --format=%s "$SHA")
-            body=$(git log -1 --format=%b "$SHA")
-            printf '%s\n\n---\nOpened automatically from `%s` by the sprint (see AGENTS.md). CI on the branch: **%s**.\n' "$body" "$BRANCH" "$RESULT" > /tmp/body.md
-            gh pr create --head "$BRANCH" --base main --title "$title" --body-file /tmp/body.md --label sprint || true
-          fi
+        # Not `|| true`: a create that fails (or leaves no pull request behind) fails this job. That is the
+        # whole point — on 2026-09-09 the repository setting "Allow GitHub Actions to create and approve
+        # pull requests" was off, `gh` said so, `|| true` ate it, and the job went green having merged
+        # nothing, twice. See scripts/sprint_merge.py and tests/test_sprint_merge.py.
+        run: python3 scripts/sprint_merge.py open-pr --branch "$BRANCH" --sha "$SHA" --result "$RESULT"
       - name: Delete the CI run this pull request could never run
         # Opening a pull request starts a CI run for a commit `push` already tested. Opened by a person it
         # skips in a second (the condition in ci.yml); opened here it cannot run at all, because GitHub will
@@ -40,16 +36,7 @@ jobs:
         # it goes. Only a completed, unsuccessful pull_request run for this commit *with no jobs at all* is
         # ever deleted; anything that ran stays. See scripts/sprint_merge.py and tests/test_sprint_merge.py.
         run: python3 scripts/sprint_merge.py prune-ghost-run --branch "$BRANCH" --sha "$SHA"
-      - name: Merge when green
-        if: env.RESULT == 'success'
-        run: |
-          set -e
-          num=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')
-          [ -n "$num" ] || exit 0
-          if gh pr view "$num" --json labels --jq '.labels[].name' | grep -qx 'needs-human'; then echo "held: needs-human"; exit 0; fi
-          gh pr merge "$num" --squash --delete-branch --body "Merged automatically: CI passed on $SHA."
-      - name: Note the failure
-        if: env.RESULT != 'success'
-        run: |
-          num=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')
-          [ -n "$num" ] && gh pr comment "$num" --body "CI **$RESULT** on $SHA. Not merged. The next Build run should fix this or close the PR." || true
+      - name: Merge when green, or say why not
+        # One step for both outcomes, with no `if:` on it, so "did nothing" is not a state this job can
+        # reach quietly: it merges, comments on a red branch, holds a `needs-human` one — or fails.
+        run: python3 scripts/sprint_merge.py merge --branch "$BRANCH" --sha "$SHA" --result "$RESULT"
