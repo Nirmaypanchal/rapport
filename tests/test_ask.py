@@ -1,7 +1,17 @@
 """Retrieval assembly for "Ask your library". No model runs here: everything up to the prompt is plain Python."""
 import pytest
 
-from rapport.ask import ask, build_user, cited, clock, keywords, passages, pick_hits, retrieve
+from rapport.ask import (
+    ask,
+    ask_stream,
+    build_user,
+    cited,
+    clock,
+    keywords,
+    passages,
+    pick_hits,
+    retrieve,
+)
 
 
 # ---- the question -> search terms ----------------------------------------
@@ -229,3 +239,93 @@ def test_ask_cites_a_summary_like_any_other_source(db, library_with_a_summary, m
     assert top["segment_id"] is None and top["heading"] == "Decisions" and top["speaker"] == ""
     assert "[[euros]]" in top["snippet"] or "euros" in top["snippet"]
     assert [s["cited"] for s in out["sources"]] == [True] + [False] * (len(out["sources"]) - 1)
+
+
+# ---- the answer as it is written ------------------------------------------
+
+# `ask_stream` is `ask` with the wait made visible. Everything before the model is identical — the same
+# excerpts, the same prompt — so what is tested here is only the shape of the delivery: deltas in the order
+# the model wrote them, then exactly one final event carrying the sources, because a citation number means
+# nothing until the whole source list is known.
+
+
+def events(*args, **kwargs) -> list[dict]:
+    return list(ask_stream(*args, **kwargs))
+
+
+def deltas(evs: list[dict]) -> list[str]:
+    return [e["delta"] for e in evs if "delta" in e]
+
+
+def final(evs: list[dict]) -> dict:
+    endings = [e for e in evs if "delta" not in e]
+    assert len(endings) == 1, f"exactly one final event, got {len(endings)}"
+    assert endings[0] is evs[-1], "the final event must be last, or a client cannot know it has arrived"
+    return endings[0]
+
+
+def streaming(monkeypatch, chunks, provider=("ollama", "llama3")):
+    monkeypatch.setattr("rapport.ask.stream_chat", lambda *a, **k: iter(chunks))
+    monkeypatch.setattr("rapport.ask.resolve_provider", lambda *a, **k: provider)
+
+
+def test_ask_stream_delivers_the_answer_as_it_is_written(db, library_with_talk, monkeypatch):
+    streaming(monkeypatch, ["Forty ", "euros ", "a seat ", "[1]."])
+    evs = events(db, "What is the pricing?")
+    assert deltas(evs) == ["Forty ", "euros ", "a seat ", "[1]."]
+    end = final(evs)
+    assert end["answer"] == "Forty euros a seat [1]."
+    assert end["model"] == {"provider": "ollama", "model": "llama3"}
+    assert end["sources"][0]["cited"] is True and end["reason"] is None
+
+
+def test_the_final_event_is_exactly_what_ask_returns(db, library_with_talk, monkeypatch):
+    """One contract, two deliveries: the panel and the MCP tool must not drift apart."""
+    streaming(monkeypatch, ["Forty euros ", "a seat [1]."])
+    monkeypatch.setattr("rapport.ask.chat", lambda *a, **k: "Forty euros a seat [1].")
+    assert final(events(db, "What is the pricing?")) == ask(db, "What is the pricing?")
+
+
+def test_ask_stream_without_a_model_is_one_event_and_no_deltas(db, library_with_talk):
+    evs = events(db, "What did we decide about pricing?", provider="off")
+    assert deltas(evs) == []
+    end = final(evs)
+    assert end["reason"] == "no_model" and end["answer"] is None and end["sources"]
+
+
+def test_ask_stream_says_when_nothing_matches(db, library_with_talk):
+    evs = events(db, "What about the helicopter?", provider="off")
+    assert deltas(evs) == [] and final(evs)["reason"] == "no_matches"
+
+
+def test_ask_stream_needs_a_question(db):
+    with pytest.raises(ValueError):
+        events(db, "   ", provider="off")
+
+
+def test_a_model_that_breaks_mid_answer_still_ends_properly(db, library_with_talk, monkeypatch):
+    """Half an answer is not an answer: the excerpts and the reason arrive as they always did, and the
+    client has one final event to replace what it was showing."""
+    def half(*a, **k):
+        yield "Forty eur"
+        raise RuntimeError("Ollama error 500: model not found")
+
+    monkeypatch.setattr("rapport.ask.stream_chat", half)
+    monkeypatch.setattr("rapport.ask.resolve_provider", lambda *a, **k: ("ollama", "llama3"))
+    evs = events(db, "What is the pricing?")
+    assert deltas(evs) == ["Forty eur"]
+    end = final(evs)
+    assert end["reason"] == "model_error" and "model not found" in end["error"]
+    assert end["answer"] is None and len(end["sources"]) == 1
+
+
+def test_a_stream_of_nothing_is_an_empty_answer(db, library_with_talk, monkeypatch):
+    streaming(monkeypatch, ["  ", "\n"])
+    end = final(events(db, "What is the pricing?"))
+    assert end["reason"] == "empty_answer" and end["answer"] is None and end["sources"]
+
+
+def test_an_empty_delta_is_not_sent(db, library_with_talk, monkeypatch):
+    """Ollama's last line carries `done` and no content; a delta of "" would only make the client work."""
+    streaming(monkeypatch, ["Forty", "", " euros [1]."])
+    assert deltas(events(db, "What is the pricing?")) == ["Forty", " euros [1]."]

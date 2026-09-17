@@ -1,8 +1,15 @@
 """Summaries: loading the shipped templates, assembling the prompt, and cutting a written summary
 into the blocks the search index and Ask cite.
 
-Nothing here talks to a model; only the prompt that would be sent is checked.
+Nothing here reaches a real model: the prompt that would be sent is checked, and the streaming path is
+driven against a fake Ollama.
 """
+import io
+import json
+import urllib.error
+
+import pytest
+
 from rapport.summarize import (
     CUSTOM_TEMPLATE,
     DEFAULT_TEMPLATE,
@@ -14,6 +21,7 @@ from rapport.summarize import (
     get_template,
     source_key,
     split_summary,
+    stream_chat,
     template_for,
     templates,
 )
@@ -152,3 +160,69 @@ def test_split_summary_cuts_a_very_long_block_on_sentence_ends():
     assert len(blocks) > 1 and all(len(t) <= MAX_BLOCK_CHARS for _, t in blocks)
     assert all(t.endswith(".") for _, t in blocks), "cuts land between sentences, not mid-word"
     assert "".join(t for _, t in blocks).count("One sentence") == 60, "nothing is lost in the cutting"
+
+
+# ---- the streaming path ---------------------------------------------------
+# `stream_chat` is `chat` delivered as it is written. Ollama answers `/api/chat` with one JSON object per
+# line; this checks that the content is read out of each of them and that the request asked for it. The MLX
+# side cannot run here (no Apple silicon) and is exercised by the nightly on the owner's Mac.
+
+
+class FakeResponse:
+    """What `urlopen` gives back: an iterable of raw lines."""
+
+    def __init__(self, lines):
+        self._lines = [l if isinstance(l, bytes) else l.encode() for l in lines]
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def __iter__(self):
+        return iter(self._lines)
+
+
+def fake_ollama(monkeypatch, lines) -> list[dict]:
+    """Answer the next `urlopen` with these lines; returns the list the request bodies land in."""
+    sent: list[dict] = []
+
+    def urlopen(req, timeout=None):
+        sent.append(json.loads(req.data))
+        return FakeResponse(lines)
+
+    monkeypatch.setattr("rapport.summarize.urllib.request.urlopen", urlopen)
+    return sent
+
+
+def chunk(content: str, done: bool = False) -> str:
+    return json.dumps({"model": "llama3", "message": {"role": "assistant", "content": content}, "done": done})
+
+
+def test_streaming_reads_the_content_out_of_every_line(monkeypatch):
+    fake_ollama(monkeypatch, [chunk("Forty "), chunk("euros"), chunk("", done=True)])
+    assert list(stream_chat("ollama", "llama3", "sys", "user")) == ["Forty ", "euros"]
+
+
+def test_streaming_asks_ollama_to_stream(monkeypatch):
+    """Without this the whole answer arrives in one line and the panel blinks for a minute as before."""
+    sent = fake_ollama(monkeypatch, [chunk("hi", done=True)])
+    list(stream_chat("ollama", "llama3", "sys", "user"))
+    assert sent[0]["stream"] is True
+    assert [m["role"] for m in sent[0]["messages"]] == ["system", "user"]
+
+
+def test_streaming_skips_a_line_that_is_not_a_chunk(monkeypatch):
+    """A blank keep-alive line, or a shape this does not know, must not end the answer or raise."""
+    fake_ollama(monkeypatch, ["", chunk("Forty"), "  ", "{not json}", chunk(" euros", done=True)])
+    assert list(stream_chat("ollama", "llama3", "sys", "user")) == ["Forty", " euros"]
+
+
+def test_streaming_stops_at_an_ollama_error(monkeypatch):
+    def urlopen(req, timeout=None):
+        raise urllib.error.HTTPError("http://x", 500, "boom", None, io.BytesIO(b"model not found"))
+
+    monkeypatch.setattr("rapport.summarize.urllib.request.urlopen", urlopen)
+    with pytest.raises(RuntimeError, match="model not found"):
+        list(stream_chat("ollama", "llama3", "sys", "user"))

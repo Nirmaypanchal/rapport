@@ -1,7 +1,22 @@
+import json
+
 from fastapi.testclient import TestClient
 
 from rapport.importer import Importer
 from rapport.server import create_app
+
+
+def ask_events(response) -> list[dict]:
+    """`/api/ask` answers newline-delimited JSON: deltas as the model writes, then one final object."""
+    assert "x-ndjson" in response.headers["content-type"]
+    return [json.loads(line) for line in response.text.splitlines() if line.strip()]
+
+
+def ask_answer(response) -> dict:
+    """The final event — the body this route used to return in one piece."""
+    events = ask_events(response)
+    assert events and "delta" not in events[-1], "the stream must end with the answer, not a delta"
+    return events[-1]
 
 
 class _Worker:
@@ -70,14 +85,14 @@ def test_ask_returns_sources_without_a_model(library, db):
     db.replace_segments(rid, [{"speaker": "SPEAKER_00", "start": 12, "end": 15, "text": "the deadline is in March"}])
     c = _client(library, db)
 
-    body = c.post("/api/ask", json={"q": "When is the deadline?"}).json()
+    body = ask_answer(c.post("/api/ask", json={"q": "When is the deadline?"}))
     assert body["answer"] is None and body["reason"] == "no_model"
     assert body["sources"][0]["kind"] == "moment"
     assert body["sources"][0]["recording_id"] == rid and body["sources"][0]["start"] == 12
     assert "deadline" in body["sources"][0]["snippet"]
 
     assert c.post("/api/ask", json={"q": "  "}).status_code == 400
-    assert c.post("/api/ask", json={"q": "nothing like this word exists"}).json()["reason"] == "no_matches"
+    assert ask_answer(c.post("/api/ask", json={"q": "nothing like this word exists"}))["reason"] == "no_matches"
 
 
 def test_ask_can_answer_from_a_summary(library, db):
@@ -86,7 +101,7 @@ def test_ask_can_answer_from_a_summary(library, db):
     db.replace_segments(rid, [{"speaker": "SPEAKER_00", "start": 12, "end": 15, "text": "so March then, probably"}])
     db.update_recording(rid, summary="## Decisions\n- The deadline is the first of March.", summary_status="done")
 
-    body = _client(library, db).post("/api/ask", json={"q": "What is the deadline?"}).json()
+    body = ask_answer(_client(library, db).post("/api/ask", json={"q": "What is the deadline?"}))
     top = body["sources"][0]
     assert top["kind"] == "summary" and top["segment_id"] is None and top["start"] == 0
     assert top["heading"] == "Decisions" and top["recording_id"] == rid
@@ -178,3 +193,23 @@ def test_import_path_returns_the_imported_ids(library, db, tmp_path):
     body = _client(library, db).post("/api/import/path", json={"path": str(src)}).json()
     assert list(body) == ["imported"]
     assert body["imported"] and db.get_recording(body["imported"][0])["original_name"] == src.name
+
+
+def test_ask_streams_the_answer_line_by_line(library, db, monkeypatch):
+    """What the panel reads: every delta on its own line, then one object with the sources. A citation
+    number only means something once the whole list has arrived, which is why it comes last."""
+    rid = db.insert_recording(sha256="6" * 64, original_name="c.wav", rel_path="audio/c.wav", status="done", title="Kickoff")
+    db.replace_segments(rid, [{"speaker": "SPEAKER_00", "start": 12, "end": 15, "text": "the deadline is in March"}])
+    monkeypatch.setattr("rapport.ask.resolve_provider", lambda *a, **k: ("ollama", "llama3"))
+    monkeypatch.setattr("rapport.ask.stream_chat", lambda *a, **k: iter(["March ", "the first [1]."]))
+
+    r = _client(library, db).post("/api/ask", json={"q": "When is the deadline?"})
+    assert r.status_code == 200
+    events = ask_events(r)
+    assert [e["delta"] for e in events[:-1]] == ["March ", "the first [1]."]
+    assert events[-1]["answer"] == "March the first [1]." and events[-1]["sources"][0]["recording_id"] == rid
+
+
+def test_ask_still_refuses_an_empty_question_with_a_status_code(library, db):
+    """A 400 has to happen before the stream starts, or the client gets 200 and a body full of nothing."""
+    assert _client(library, db).post("/api/ask", json={"q": "  "}).status_code == 400
