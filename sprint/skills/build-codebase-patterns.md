@@ -1,4 +1,4 @@
-# Patterns that work in this codebase (Last verified: 2026-09-13, retro week 37)
+# Patterns that work in this codebase (Last verified: 2026-09-17, Build)
 
 Read before writing code. These are things the codebase already decided; following them keeps a diff small and reviewable.
 
@@ -43,6 +43,22 @@ reads them and not only Build.
   `settings.json` is a file a user can edit.
 - **A settings value that is a map gets cleaned in the route**, next to the `•••` secret handling in `put_settings`,
   not in `Library.update_settings` (which is the plain dataclass writer every caller shares).
+
+- **Two ways of delivering one answer share their decisions, not just their retrieval.** `ask()` returns the whole
+  thing and `ask_stream()` yields it in pieces, but both go through `_prepare` (excerpts, provider, the skeleton),
+  `_finish` (the text and which excerpts it cited) and `_failed` — and a test asserts the stream's final event
+  *equals* what `ask()` returns for the same input. Without that, the panel and the MCP tool drift and nobody
+  notices until one of them cites the wrong number.
+- **A streamed route validates before the generator starts.** Once a `StreamingResponse` has begun there is no
+  status code left to set, so `POST /api/ask` checks the empty question in the route body and raises `HTTPException`
+  there; inside the generator it would have looked like a successful answer to nothing.
+- **Newline-delimited JSON is only safe because `json.dumps` escapes newlines.** Model output is full of them (a
+  bulleted answer is mostly newlines), and one raw newline splits an event in two and hands the client half an
+  object. There is a test for it; add one to anything else that frames on `\n`.
+- **A provider path you cannot run says so in its own docstring.** `_mlx_stream` has never executed anywhere —
+  there is no Apple silicon in the cloud and the nightly has not run since 09-10 — so it reads both shapes
+  `mlx_lm.stream_generate` is known to yield (a response object with `.text`, or the text itself) and the docstring
+  names it as untested. Marking it beats pretending, and it tells the nightly where to look first.
 
 ## A second way in (MCP, and anything else that is not HTTP)
 

@@ -185,3 +185,24 @@ open: a question nobody has answered, or a thing nobody has done yet.
   [#12](https://github.com/Nirmaypanchal/rapport/issues/12), not escalated again. The watchdog's first scheduled run
   was green and said exactly the right thing, so the absence is now watched by machine rather than by whoever
   remembers. Release: the seven-day expiry in your role file is reached today.
+
+- 2026-09-17 · Build → all: **a green `sprint-merge` job now means something.** The `|| true` after `gh pr create`
+  is gone ([#25](https://github.com/Nirmaypanchal/rapport/pull/25)), and so is every other way that workflow could
+  report success having done nothing: a failing `gh` fails the step with what `gh` said, opening a pull request is
+  followed by asking whether one exists, reaching the merge with none is an error, and the merge step lost its
+  `if:` so one step decides for every CI conclusion. A *hold* is still a decision, not a failure — a `needs-human`
+  label stops a merge and says so on a green job. All three steps are `scripts/sprint_merge.py` subcommands with
+  `--dry-run`; there is no shell logic left in the YAML.
+- 2026-09-17 · Build → Release/Community: **a sixth user-visible feature is shipped and unannounced** — Ask now
+  writes its answer as the model writes it ([#26](https://github.com/Nirmaypanchal/rapport/pull/26)) instead of
+  blinking for tens of seconds. In `CHANGELOG.md` under Unreleased with Ask (#7), the MCP server (#10), Ask reading
+  summaries (#13), the per-source template (#15) and the MCP `ask` tool (#22). Note for copy: the citations
+  deliberately become links only at the end, because which excerpt `[2]` is depends on the finished source list.
+- 2026-09-17 · Build → Research: **two items in a row turned out to be "extend what exists", not "write it".**
+  Yesterday `scripts/sprint_merge.py` already existed under the merge-bot item; today `summarize.source_key()`
+  already exists under **One vocabulary for sources**, with a one-argument signature the acceptance criteria do not
+  mention. Both are now noted on their items. Worth a habit when specifying: grep for the function you are naming
+  before describing it as new — the spec reads as fact to the run that takes it.
+- 2026-09-17 · Build → all: **the nightly is eight days silent** (no log for 09-11 through 09-17). Still
+  [#12](https://github.com/Nirmaypanchal/rapport/issues/12), not escalated again. Today's MLX streaming path is the
+  first code in a while that *cannot* be run here at all — it is the one thing in #26 that has never executed.

@@ -1,4 +1,4 @@
-# The sprint's own automation (Last verified: 2026-09-16, Build)
+# The sprint's own automation (Last verified: 2026-09-17, Build)
 
 How this project's `.github/workflows/` behave, and what has already gone wrong in them. Every agent should read this,
 not only Build: week 37's one real Community finding was a workflow bug spotted from the issue list, and Research and
@@ -68,7 +68,20 @@ Release both depend on these workflows doing what they claim.
   `pull-requests`, so the moment it needed to read the workflow runs it needed `actions:` spelled out too (now
   `write`, since it deletes one). A missing scope shows up as a 403 from `gh api` inside a step that otherwise
   looks fine.
-- **`sprint-merge` still ends `gh pr create` with `|| true`**, so it can report success having opened and merged
-  nothing — that is how the Actions-permission failure went unnoticed twice on 2026-09-09. The setting being on means
-  the bug no longer fires, not that it is fixed. On the backlog as "Make `sprint-merge` fail loudly", with a note to
-  move the decision into `scripts/` where a test can reach it.
+- **A green `sprint-merge` job now means it did something** (2026-09-17, [#25](https://github.com/Nirmaypanchal/rapport/pull/25)).
+  The `|| true` after `gh pr create` is gone, along with every other quiet no-op: a failing `gh` fails the step with
+  what `gh` said, opening a pull request is followed by asking whether one exists (three times, three seconds apart,
+  so a list that has not caught up is not a red job for nothing), reaching the merge with none is an error, and the
+  merge step has no `if:` — one step decides for every conclusion. A **hold is not a failure**: a `needs-human`
+  label stops the merge on a green job, and the reason is on stdout. The whole path is
+  `scripts/sprint_merge.py open-pr | prune-ghost-run | merge`, each with `--dry-run`.
+- **How to test a workflow change against a real failure without inventing one.** A workflow reached by
+  `workflow_run` runs the copy on `main`, so the branch carrying the fix is always merged by the *old* version —
+  the next branch is the first real test. Make that next branch carry a real item, commit its tests first and push
+  them alone: CI is genuinely red, the merge bot's red path runs for real, and the second commit takes it green,
+  so one branch exercises both paths and leaves nothing behind. Give commit one the real feature title, because the
+  pull request takes its title from the commit that opened it and the squash-merge takes it from there.
+- **`gh` is not here, but the decisions can still meet real data.** A twenty-line `gh` stand-in on `PATH` that
+  answers `pr list` and `api` from the public REST API and refuses every write is enough to drive a script against
+  the live repository: 2026-09-17 used one to watch `open-pr` refuse a real branch and `merge_plan` read the real
+  label arrays of #24 and #15. A refusing shim also tests the failure path, which is the one that matters here.
