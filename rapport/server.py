@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -787,15 +787,25 @@ def create_app(library: Library, db: Database, importer: Importer, worker, recor
     def ask_library(body: AskBody):
         """Answer a question from the transcripts themselves: local full-text search, then the local model.
 
-        The excerpts come back either way, so the answer is still useful with no model installed.
-        """
-        from .ask import ask
+        Newline-delimited JSON: `{"delta": "…"}` for each piece the model writes, then exactly one final
+        object — the same body this route used to return in one piece, with the excerpts, the model and the
+        reason there is no answer when there is none. A big model takes tens of seconds, and this is what
+        lets the panel show the answer being written instead of a blinking dot.
 
+        The question is checked here rather than inside the generator: once the response has started, a 400
+        can no longer be sent, and an empty question would look like a successful answer to nothing.
+        """
+        from .ask import ask_stream
+
+        if not (body.q or "").strip():
+            raise HTTPException(400, "ask a question")
         s = library.settings
-        try:
-            return ask(db, body.q, s.summary_provider, s.summary_model or None)
-        except ValueError as e:
-            raise HTTPException(400, str(e))
+
+        def events():
+            for event in ask_stream(db, body.q, s.summary_provider, s.summary_model or None):
+                yield json.dumps(event, ensure_ascii=False) + "\n"
+
+        return StreamingResponse(events(), media_type="application/x-ndjson")
 
     # ---- UI ----------------------------------------------------------------
     @app.middleware("http")

@@ -59,7 +59,7 @@ All routes are under `/api`, JSON, on 127.0.0.1. In the desktop app every call n
 | GET | `/api/recordings/{id}/audio` · `/original` · `/transcript.txt` · `/condensed` · `/speech` | media and derived data |
 | GET/POST | `/api/people`, `/api/people/{id}`, `/merge/{other}`, `/api/people/reset` | people |
 | GET | `/api/search?q=` | full-text search with snippets |
-| POST | `/api/ask` | `{q}` → `{answer, sources, model, reason}`: retrieval plus the local model |
+| POST | `/api/ask` | `{q}` → newline-delimited JSON: `{delta}` per piece, then `{answer, sources, model, reason}` |
 | GET/POST | `/api/sources`, `/api/sources/{name}/sync`, `/api/voicememos`, `/api/voicememos/import` | sources |
 | POST | `/api/import/upload` (multipart) · `/api/import/path` | bring files in |
 | POST | `/api/record/start` · `/api/record/stop` | live recording |
@@ -86,7 +86,8 @@ rapport-core --mcp                                 # the same code, from the fro
   are checked against each other by a test. Handlers return a plain dict and raise `ToolError` for anything the
   caller got wrong — that comes back as a failed tool result the model can read, not a protocol error.
 - Retrieval is not duplicated: `search` is `rapport/ask.py`'s keyword extraction and `retrieve()` in an MCP
-  envelope, and `ask` is `ask.ask()` — the same call `POST /api/ask` makes — in that same envelope. Fix retrieval
+  envelope, and `ask` is `ask.ask()` — the one-piece twin of the `ask.ask_stream()` behind `POST /api/ask`, sharing
+  the same preparation and the same ending, asserted equal by a test — in that same envelope. Fix retrieval
   there and every feature improves. Both tools describe an excerpt through one function (`_excerpt`), so a `kind`
   means the same thing in either: a `moment` has a timestamp, a `summary` block does not. An `ask` source is that
   same excerpt plus the number the answer cites it by.

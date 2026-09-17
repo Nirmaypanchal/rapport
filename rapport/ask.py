@@ -15,9 +15,10 @@ nothing is ever invented to fill the gap.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass
 
-from .summarize import chat, resolve_provider
+from .summarize import chat, resolve_provider, stream_chat
 
 SEARCH_LIMIT = 60      # FTS hits considered before they are thinned into excerpts
 MAX_PASSAGES = 8       # excerpts shown, and given to the model
@@ -213,10 +214,11 @@ def cited(answer: str, count: int) -> list[int]:
     return list(dict.fromkeys(n for n in nums if 1 <= n <= count))
 
 
-def ask(db, question: str, provider: str = "auto", model: str | None = None, limit: int = SEARCH_LIMIT) -> dict:
-    """Answer `question` from the library. Always returns the excerpts, with or without a written answer.
+def _prepare(db, question: str, provider: str, model: str | None, limit: int) -> tuple[dict, list, tuple | None]:
+    """Everything before the model: the excerpts, the answer they will go into, and who will write it.
 
-    `reason` says why there is no answer: `no_matches`, `no_model`, `model_error` or `empty_answer`.
+    The provider is `None` when there is nothing to write with, and `out["reason"]` already says why the
+    answer will stay empty. Both `ask` and `ask_stream` start here, so they cannot disagree about it.
     """
     q = (question or "").strip()
     if not q:
@@ -232,18 +234,19 @@ def ask(db, question: str, provider: str = "auto", model: str | None = None, lim
     }
     if not found:
         out["reason"] = "no_matches"
-        return out
+        return out, found, None
     target = resolve_provider(provider, model)
     if target is None:
         out["reason"] = "no_model"
-        return out
+        return out, found, None
     out["model"] = {"provider": target[0], "model": target[1]}
-    try:
-        text = chat(target[0], target[1], SYSTEM, build_user(q, found), max_tokens=600, timeout=180).strip()
-    except Exception as e:  # a model that is missing, busy or broken must not lose the excerpts
-        out["reason"] = "model_error"
-        out["error"] = str(e)[:300]
-        return out
+    return out, found, target
+
+
+def _finish(out: dict, text: str, found: list) -> dict:
+    """The written answer, with the excerpts it used marked. Shared so one delivery cannot cite differently
+    from the other."""
+    text = (text or "").strip()
     if not text:
         out["reason"] = "empty_answer"
         return out
@@ -253,3 +256,55 @@ def ask(db, question: str, provider: str = "auto", model: str | None = None, lim
         for s in out["sources"]:
             s["cited"] = s["n"] in used
     return out
+
+
+def _failed(out: dict, e: Exception) -> dict:
+    """A model that is missing, busy or broken must not lose the excerpts."""
+    out["answer"] = None
+    out["reason"] = "model_error"
+    out["error"] = str(e)[:300]
+    return out
+
+
+def ask(db, question: str, provider: str = "auto", model: str | None = None, limit: int = SEARCH_LIMIT) -> dict:
+    """Answer `question` from the library. Always returns the excerpts, with or without a written answer.
+
+    `reason` says why there is no answer: `no_matches`, `no_model`, `model_error` or `empty_answer`.
+    """
+    out, found, target = _prepare(db, question, provider, model, limit)
+    if target is None:
+        return out
+    try:
+        text = chat(target[0], target[1], SYSTEM, build_user(out["question"], found), max_tokens=600, timeout=180)
+    except Exception as e:
+        return _failed(out, e)
+    return _finish(out, text, found)
+
+
+def ask_stream(db, question: str, provider: str = "auto", model: str | None = None,
+               limit: int = SEARCH_LIMIT) -> Iterator[dict]:
+    """The same answer as `ask`, delivered while it is being written.
+
+    Yields `{"delta": "…"}` for each piece the model writes, then **exactly one** final event: the dict
+    `ask` would have returned. Everything that depends on the whole answer waits for that event — the
+    citation numbers point into `sources`, which is only complete at the end, so a client shows the deltas
+    as plain text and renders the citations once, when the final event arrives.
+
+    A model that breaks halfway is not half an answer: the final event carries `reason: "model_error"` and
+    `answer: None`, exactly as `ask` does, and the client replaces what it was showing.
+    """
+    out, found, target = _prepare(db, question, provider, model, limit)
+    if target is None:
+        yield out
+        return
+    pieces: list[str] = []
+    try:
+        for piece in stream_chat(target[0], target[1], SYSTEM, build_user(out["question"], found),
+                                 max_tokens=600, timeout=180):
+            if piece:  # the last line Ollama sends carries `done` and no content
+                pieces.append(piece)
+                yield {"delta": piece}
+    except Exception as e:
+        yield _failed(out, e)
+        return
+    yield _finish(out, "".join(pieces), found)
