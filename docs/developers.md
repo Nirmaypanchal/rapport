@@ -58,7 +58,7 @@ All routes are under `/api`, JSON, on 127.0.0.1. In the desktop app every call n
 | POST | `/api/recordings/{id}/speakers/{label}/assign` | link a speaker to a person |
 | GET | `/api/recordings/{id}/audio` · `/original` · `/transcript.txt` · `/condensed` · `/speech` | media and derived data |
 | GET/POST | `/api/people`, `/api/people/{id}`, `/merge/{other}`, `/api/people/reset` | people |
-| GET | `/api/search?q=` | full-text search with snippets |
+| GET | `/api/search?q=` | full-text search with snippets → `{moments, summaries}`, two rankings kept apart |
 | POST | `/api/ask` | `{q}` → newline-delimited JSON: `{delta}` per piece, then `{answer, sources, model, reason}` |
 | GET/POST | `/api/sources`, `/api/sources/{name}/sync`, `/api/voicememos`, `/api/voicememos/import` | sources |
 | POST | `/api/import/upload` (multipart) · `/api/import/path` | bring files in |

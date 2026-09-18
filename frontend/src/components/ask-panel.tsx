@@ -1,13 +1,14 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { FileText, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { askStream, type AskAnswer, type AskSource } from "@/lib/api";
 import { fmtDate, fmtTime } from "@/lib/format";
 import { speakerStyle } from "@/lib/speakers";
 import { SpeakerDot } from "@/components/avatar";
 import { Markdown } from "@/components/markdown";
 import { Snippet } from "@/components/snippet";
+import { SummaryHitCard } from "@/components/summary-hit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -101,25 +102,24 @@ export function AskPanel({ active }: { active: boolean }) {
 }
 
 /** One excerpt, numbered the way the answer cites it. A moment opens the recording a second before the turn;
- *  a summary block has no second to open, so it opens the Summary tab where it is written. */
+ *  a summary block has no second to open, so it opens the Summary tab where it is written — in the same card
+ *  Search shows for a summary it found (`summary-hit.tsx`), with the citation number as its badge. */
 function Source({ s, dim }: { s: AskSource; dim: boolean }) {
-  const summary = s.kind === "summary";
+  const n = <span className={`tc grid size-5 shrink-0 place-items-center rounded-[5px] text-[11px] font-semibold ${dim ? "bg-surface-2 text-ink-3" : "bg-signal-soft text-signal"}`}>{s.n}</span>;
+  if (s.kind === "summary")
+    return <SummaryHitCard id={`ask-source-${s.n}`} recordingId={s.recording_id} heading={s.heading} title={s.title} recordedAt={s.recorded_at} snippet={s.snippet} badge={n} dim={dim} />;
   return (
     <Link
       id={`ask-source-${s.n}`}
-      href={summary ? `/?id=${s.recording_id}&tab=summary` : `/?id=${s.recording_id}&t=${Math.max(0, s.start - 1).toFixed(1)}`}
+      href={`/?id=${s.recording_id}&t=${Math.max(0, s.start - 1).toFixed(1)}`}
       style={speakerStyle(s.person_color)}
       className={`speaker rounded-lg border border-hairline bg-surface px-4 py-3 transition-colors hover:border-[var(--c)] ${dim ? "opacity-65" : ""}`}
     >
       <div className="flex flex-wrap items-center gap-x-3 text-[12px] text-ink-2">
-        <span className={`tc grid size-5 shrink-0 place-items-center rounded-[5px] text-[11px] font-semibold ${dim ? "bg-surface-2 text-ink-3" : "bg-signal-soft text-signal"}`}>{s.n}</span>
-        {summary ? (
-          <span className="inline-flex items-center gap-1.5 font-semibold text-ink-2"><FileText className="size-3.5" />Summary{s.heading ? ` · ${s.heading}` : ""}</span>
-        ) : (
-          <span className="inline-flex items-center gap-1.5 font-semibold text-[var(--c)]"><SpeakerDot color={s.person_color} />{s.speaker}</span>
-        )}
+        {n}
+        <span className="inline-flex items-center gap-1.5 font-semibold text-[var(--c)]"><SpeakerDot color={s.person_color} />{s.speaker}</span>
         <span>{s.title}{s.recorded_at ? `, ${fmtDate(s.recorded_at)}` : ""}</span>
-        {!summary && <span className="tc">{fmtTime(s.start)}</span>}
+        <span className="tc">{fmtTime(s.start)}</span>
       </div>
       <div className="mt-1 text-[15px]"><Snippet s={s.snippet} /></div>
     </Link>

@@ -75,7 +75,10 @@ from Granola or Omi keep the summary those apps wrote.
 ### 6. Playback and search
 
 The transport shows a waveform, a speaker lane, and a playhead synced to the transcript. Skip silences removes pauses on the fly.
-Search is SQLite full-text search across every transcript; a hit opens the recording at that second.
+Search is SQLite full-text search across every transcript; a hit opens the recording at that second. It searches your
+written summaries too, block by block, and puts those hits at the top of the list — the sentence that answers the word
+you typed is usually in the summary rather than in the turns that led up to it. A summary hit carries a **Summary**
+badge instead of a timestamp and opens that recording's Summary tab, because a summary has no second to jump to.
 
 ### 7. Ask your library
 

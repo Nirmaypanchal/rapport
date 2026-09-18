@@ -173,7 +173,24 @@ export type SearchHit = {
   person_color: string | null;
 };
 
-/** One moment behind an answer: the turn that matched, with the turns around it. `n` is the number the answer cites. */
+/** One block of a written summary that matched. No `start`: a summary block has no second to open at,
+ *  which is why its card opens the recording's Summary tab instead of the player. */
+export type SummaryHit = {
+  id: number;
+  recording_id: number;
+  idx: number;
+  heading: string | null;
+  text: string;
+  snippet: string;
+  title: string | null;
+  original_name: string;
+  recorded_at: string | null;
+};
+
+/** What Search finds: the turns that match and the summary blocks that do, as two lists. Not one
+ *  re-ranked list — the two bm25 scores come from different FTS tables and are not on the same scale. */
+export type SearchResults = { moments: SearchHit[]; summaries: SummaryHit[] };
+
 /** One piece of evidence behind an answer: a `moment` that was said, or a block of a written `summary`.
  *  A summary has no timestamp, so `segment_id` is null and `start` is 0 — it opens on the Summary tab. */
 export type AskSource = {

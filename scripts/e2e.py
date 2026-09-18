@@ -111,7 +111,7 @@ def main() -> int:
         assert rec["segments"] and rec["segments"][0].get("words"), "no word timestamps"
         speakers = rec.get("speakers") or []
         assert len(speakers) >= 1, "no speakers detected"
-        hits = api(base, token, "/api/search?q=marathon")
+        hits = api(base, token, "/api/search?q=marathon")["moments"]
         assert any(h["recording_id"] == rid for h in hits), "search did not find the recording"
         secs = time.time() - t1
         print(f"\n## e2e OK\n- model: {model}\n- pipeline: {secs:.0f}s\n- speakers: {len(speakers)} (2 expected)\n- transcript: {text[:160]}…\n- library: {lib}")

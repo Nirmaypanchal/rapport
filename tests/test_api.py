@@ -74,9 +74,61 @@ def test_search_and_recordings(library, db):
     db.replace_segments(rid, [{"speaker": "SPEAKER_00", "start": 0, "end": 1, "text": "pastel colours everywhere"}])
     c = _client(library, db)
     assert c.get("/api/recordings").json()[0]["id"] == rid
-    assert c.get("/api/search", params={"q": "pastel"}).json()[0]["recording_id"] == rid
+    assert c.get("/api/search", params={"q": "pastel"}).json()["moments"][0]["recording_id"] == rid
     r = c.patch(f"/api/recordings/{rid}", json={"title": "Design review"})
     assert r.status_code == 200 and db.get_recording(rid)["title"] == "Design review"
+
+
+def test_search_finds_summaries_beside_moments(library, db):
+    """The word is in both halves of the library, so one query must come back with both."""
+    rid = db.insert_recording(sha256="7" * 64, original_name="q3.wav", rel_path="audio/q3.wav", status="done", title="Pricing sync")
+    db.replace_segments(rid, [{"speaker": "SPEAKER_00", "start": 30, "end": 33, "text": "so what do we do about pricing"}])
+    db.update_recording(rid, summary="## Decisions\n- Pricing lands at forty euros a seat.", summary_status="done")
+
+    found = _client(library, db).get("/api/search", params={"q": "pricing"}).json()
+    assert [m["recording_id"] for m in found["moments"]] == [rid]
+    assert len(found["summaries"]) == 1
+    hit = found["summaries"][0]
+    assert hit["recording_id"] == rid and hit["heading"] == "Decisions" and hit["title"] == "Pricing sync"
+    assert "[[Pricing]]" in hit["snippet"], "a summary hit marks the matching words like any other"
+    assert "start" not in hit, "a summary block has no timestamp, and the card must not be able to pretend it has one"
+
+
+def test_search_finds_a_word_only_the_summary_uses(library, db):
+    """The point of the whole thing: the summary says it in a word nobody said out loud."""
+    rid = db.insert_recording(sha256="8" * 64, original_name="w.wav", rel_path="audio/w.wav", status="done", title="Kickoff")
+    db.replace_segments(rid, [{"speaker": "SPEAKER_00", "start": 0, "end": 2, "text": "let us give it another two weeks"}])
+    db.update_recording(rid, summary="- The launch was postponed.", summary_status="done")
+
+    found = _client(library, db).get("/api/search", params={"q": "postponed"}).json()
+    assert found["moments"] == [], "no turn contains the word"
+    assert [s["recording_id"] for s in found["summaries"]] == [rid]
+
+
+def test_search_caps_the_summaries_and_never_the_moments(library, db):
+    """Summaries are there to answer in a sentence, not to push the transcript off the page."""
+    for i in range(8):
+        rid = db.insert_recording(sha256=str(i) * 64, original_name=f"{i}.wav", rel_path=f"audio/{i}.wav", status="done", title=f"Call {i}")
+        db.replace_segments(rid, [{"speaker": "SPEAKER_00", "start": 0, "end": 1, "text": "quarterly budget talk"}])
+        db.update_recording(rid, summary="- The budget holds.", summary_status="done")
+
+    found = _client(library, db).get("/api/search", params={"q": "budget"}).json()
+    assert len(found["summaries"]) == 5
+    assert len(found["moments"]) == 8
+
+
+def test_search_says_nothing_rather_than_half_an_answer(library, db, monkeypatch):
+    """Both halves come from one call, so a failure in either is still a 400 with the reason — never
+    one array and a missing one, which the UI would render as "no summaries matched"."""
+    c = _client(library, db)
+    assert c.get("/api/search", params={"q": ""}).json() == {"moments": [], "summaries": []}
+
+    def unhappy(*a, **k):
+        raise RuntimeError("fts is unhappy")
+
+    monkeypatch.setattr(db, "search_summaries", unhappy)
+    r = c.get("/api/search", params={"q": "anything"})
+    assert r.status_code == 400 and r.json() == {"error": "fts is unhappy"}
 
 
 def test_ask_returns_sources_without_a_model(library, db):
