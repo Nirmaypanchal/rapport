@@ -1,4 +1,4 @@
-# Patterns that work in this codebase (Last verified: 2026-09-17, Build)
+# Patterns that work in this codebase (Last verified: 2026-09-18, Build)
 
 Read before writing code. These are things the codebase already decided; following them keeps a diff small and reviewable.
 
@@ -55,6 +55,18 @@ reads them and not only Build.
 - **Newline-delimited JSON is only safe because `json.dumps` escapes newlines.** Model output is full of them (a
   bulleted answer is mostly newlines), and one raw newline splits an event in two and hands the client half an
   object. There is a test for it; add one to anything else that frames on `\n`.
+- **Changing a route's response shape? Grep for the route string, not for the type.** `/api/search` went from a
+  list to `{moments, summaries}`; `frontend/` catches that at `tsc`, but `scripts/e2e.py` calls the same route and
+  is typechecked by nothing, and only the owner's Mac ever runs it — a stale reader there surfaces as a nightly
+  failure days later with no obvious cause. `grep -rn "api/<route>"` across the repository, including `scripts/`
+  and `docs/`, is the whole technique. (`rapport/mcp.py` is the reassuring case: it opens SQLite directly, so a
+  route change never touches it.)
+- **Two things fetched for one answer fail together or not at all.** Compute both inside the one `try` and
+  return them in one expression, so a raising half cannot come back as the other half plus a missing key — which a
+  UI renders as a confident empty result ("nothing in your summaries matched") rather than as the error it is.
+  It also means the only way to reach that branch may be a monkeypatched raise: in `/api/search` every term is
+  quoted before it reaches `MATCH`, and `""""`, `"*"`, `"?"` and `"NEAR"` all come back empty from SQLite rather
+  than erroring, so there is no query a user can type that fails. Test the branch you have, not one you wish for.
 - **A provider path you cannot run says so in its own docstring.** `_mlx_stream` has never executed anywhere —
   there is no Apple silicon in the cloud and the nightly has not run since 09-10 — so it reads both shapes
   `mlx_lm.stream_generate` is known to yield (a response object with `.text`, or the text itself) and the docstring
@@ -90,6 +102,15 @@ reads them and not only Build.
 - **Shared renderers live in `frontend/src/components/`**: `markdown.tsx` (the small Markdown subset the local
   models are asked for) and `snippet.tsx` (the `[[…]]` marks SQLite puts in a search snippet). Both were duplicated
   in two features before; if you need a third copy, move it here instead.
+- **When two lists show the same card, extract the card and pass the ornament as a prop.** The summary card lives in
+  `summary-hit.tsx` and knows nothing about who is rendering it: Ask hands it a `badge` (the citation number) and a
+  `dim` flag, Search hands it neither. The alternative — a `kind`/`mode` prop, or copying the classes — is how the
+  two lists come to disagree about what a summary hit looks like. The signal that an extraction is right: the shared
+  component has no conditional that names a caller.
+- **`frontend/AGENTS.md` is generated, and its claim checks out.** `next dev` writes that block (verified 2026-09-18:
+  `node_modules/next/dist/server/lib/generate-agent-files.js` and `node_modules/next/dist/docs/` both exist after
+  `npm ci`). So read `node_modules/next/dist/docs/` before using a Next.js API you are recalling rather than reading,
+  and commit the block with your work rather than trying to drop it from a diff.
 - **Base UI tabs keep panel state with `keepMounted`** on `TabsContent`. Without it, switching tabs throws the
   panel's state away — an answer the user waited a minute for. With it, don't use `autoFocus` in a hidden panel:
   pass the active tab down and focus with a ref in an effect.

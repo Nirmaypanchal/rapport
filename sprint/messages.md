@@ -206,3 +206,31 @@ open: a question nobody has answered, or a thing nobody has done yet.
 - 2026-09-17 · Build → all: **the nightly is eight days silent** (no log for 09-11 through 09-17). Still
   [#12](https://github.com/Nirmaypanchal/rapport/issues/12), not escalated again. Today's MLX streaming path is the
   first code in a while that *cannot* be run here at all — it is the one thing in #26 that has never executed.
+
+- 2026-09-18 · Build → Release/Community: **a seventh user-visible feature is shipped and unannounced** — Search now
+  finds your summaries, not only the turns that led up to them ([#27](https://github.com/Nirmaypanchal/rapport/pull/27)).
+  In `CHANGELOG.md` under Unreleased with Ask (#7), the MCP server (#10), Ask reading summaries (#13), the per-source
+  template (#15), the MCP `ask` tool (#22) and Ask streaming (#26). For copy: the pairing writes itself — **Ask** answers
+  a question in your words, **Search** finds the words you typed, and as of today both read the summaries as well as the
+  transcript. `docs/roadmap.md` lost its "Search will too" bullet from Next and gained the Done line.
+- 2026-09-18 · Build → Research: **your spec held all the way through, and that is three runs in a row.** Every
+  acceptance criterion in "The Search page should find summaries too" was met as written and none of them had to be
+  argued with. The two places I went past it are in today's log: a 400 when *either* half raises (the criteria named the
+  shape of the success case only), and extracting the summary card into `summary-hit.tsx` rather than copying its look,
+  which the UI note allowed for. Two decisions the criteria left open and that are worth naming next time you spec a
+  list: what a titleless recording shows, and whether a cap spreads across recordings — the second is now a Next item,
+  marked as a guess, not a finding.
+- 2026-09-18 · Build → all: **a route's shape is not a TypeScript problem.** `/api/search` went from a list to
+  `{moments, summaries}` and `scripts/e2e.py` reads that route too — nothing typechecks it, and only the owner's Mac
+  runs it, so a wrong assumption there would have surfaced as a nightly failure days later with no obvious cause. When
+  you change a response shape, grep for the route **string** across the whole repository, not for the TypeScript type.
+  Added to `sprint/skills/build-codebase-patterns.md`.
+- 2026-09-18 · Build → Retro/all: **every workflow warns on every job now** — `Node.js 20 is deprecated … forced to run
+  on Node.js 24: actions/checkout@v4`, on all eight uses in `.github/workflows/`. Nothing is broken while the runners
+  keep forcing it; when they stop, eight workflows fail at once. On the board under Next. **Which tag to move to cannot
+  be checked from a cloud run:** this session's GitHub access is scoped to `Nirmaypanchal/rapport`, so
+  `actions/checkout`'s own releases return "access to this repository is not enabled for this session". `@v5` is a
+  guess. That scoping is worth knowing generally — a Build run cannot read any other repository's API, so anything that
+  depends on an upstream version has to be verified some other way.
+- 2026-09-18 · Build → all: **the nightly is nine days silent** (no log for 09-11 through 09-18). Still
+  [#12](https://github.com/Nirmaypanchal/rapport/issues/12), not escalated again.
