@@ -776,10 +776,20 @@ def create_app(library: Library, db: Database, importer: Importer, worker, recor
         return {"ok": True}
 
     # ---- search ------------------------------------------------------------
+    SUMMARY_HITS = 5
+
     @app.get("/api/search")
     def search(q: str = ""):
+        """Every turn that matches, and the blocks of written summary that do.
+
+        Two arrays rather than one list: the bm25 scores come from two different FTS tables, over
+        one-line turns and over paragraphs, so ranking them against each other would be a guess
+        dressed up as a number (the same reason `ask.retrieve` gives each index a budget). Summaries
+        are capped low because they are there to answer the question in a sentence, not to fill the
+        page; the caller shows them first and the moments below them.
+        """
         try:
-            return db.search(q)
+            return {"moments": db.search(q), "summaries": db.search_summaries(q, limit=SUMMARY_HITS, match="all")}
         except Exception as e:
             return JSONResponse({"error": str(e)}, status_code=400)
 

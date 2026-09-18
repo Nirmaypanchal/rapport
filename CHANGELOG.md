@@ -6,6 +6,11 @@ All notable changes to Rapport. The format follows Keep a Changelog; versions fo
 
 ### Added
 
+- **Search finds your summaries, not just your transcripts.** Typing "pricing" used to search the words people said
+  and miss the summary that states the answer in one sentence. Summary hits now lead the results, each with a
+  **Summary** badge and the block's heading instead of a timestamp, and open that recording's Summary tab.
+  `GET /api/search` answers `{moments, summaries}` — two lists, because two full-text rankings cannot be ranked
+  against each other.
 - **A summary template per source.** A Granola sync is a meeting; a voice memo on a walk is not. Settings → Template
   by source gives each source you import from a template of its own, and new summaries take that shape without
   anyone picking: a recording's own template still wins, then its source's, then the one default. The list shows the

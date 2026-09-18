@@ -3,12 +3,13 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
-import { fetcher, type SearchHit } from "@/lib/api";
+import { fetcher, type SearchResults } from "@/lib/api";
 import { fmtClock, fmtDate, fmtTime } from "@/lib/format";
 import { speakerStyle } from "@/lib/speakers";
 import { SpeakerDot } from "@/components/avatar";
 import { AskPanel } from "@/components/ask-panel";
 import { Snippet } from "@/components/snippet";
+import { SummaryHitCard } from "@/components/summary-hit";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -19,17 +20,23 @@ function FindTab() {
   const [debounced, setDebounced] = useState(q);
   useEffect(() => { const t = setTimeout(() => setDebounced(q), 200); return () => clearTimeout(t); }, [q]);
   useEffect(() => { history.replaceState(null, "", debounced ? `/search/?q=${encodeURIComponent(debounced)}` : "/search/"); }, [debounced]);
-  const { data: hits } = useSWR<SearchHit[] | { error: string }>(debounced.trim() ? `/api/search?q=${encodeURIComponent(debounced)}` : null, fetcher, { keepPreviousData: true });
-  const list = Array.isArray(hits) ? hits : null;
+  const { data: hits } = useSWR<SearchResults | { error: string }>(debounced.trim() ? `/api/search?q=${encodeURIComponent(debounced)}` : null, fetcher, { keepPreviousData: true });
+  const found = hits && !("error" in hits) ? hits : null;
+  const failed = hits && "error" in hits ? hits.error : null;
 
   return (
     <div>
       <Input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search every transcript…" className="mt-4 h-12 bg-surface text-[16px]" />
       <div className="mt-4 grid gap-2">
-        {hits && !Array.isArray(hits) && <div className="text-[13px] text-clip">{hits.error}</div>}
-        {list && !list.length && <div className="p-8 text-center text-[13px] text-ink-3">Nothing found.</div>}
-        {list?.map((x) => (
-          <Link key={x.id} href={`/?id=${x.recording_id}&t=${Math.max(0, x.start - 1).toFixed(1)}`} className="speaker rounded-lg border border-hairline bg-surface px-4 py-3 transition-colors hover:border-[var(--c)]" style={speakerStyle(x.person_color)}>
+        {failed && <div className="text-[13px] text-clip">{failed}</div>}
+        {found && !found.summaries.length && !found.moments.length && <div className="p-8 text-center text-[13px] text-ink-3">Nothing found.</div>}
+        {/* A summary that says it in one sentence is worth more than the turns that led up to it, so
+            summaries lead — one list, told apart by the badge on the card, not by a divider. */}
+        {found?.summaries.map((x) => (
+          <SummaryHitCard key={`summary-${x.id}`} recordingId={x.recording_id} heading={x.heading} title={x.title} recordedAt={x.recorded_at} snippet={x.snippet} />
+        ))}
+        {found?.moments.map((x) => (
+          <Link key={`moment-${x.id}`} href={`/?id=${x.recording_id}&t=${Math.max(0, x.start - 1).toFixed(1)}`} className="speaker rounded-lg border border-hairline bg-surface px-4 py-3 transition-colors hover:border-[var(--c)]" style={speakerStyle(x.person_color)}>
             <div className="flex flex-wrap items-center gap-x-3 text-[12px] text-ink-2">
               <span className="inline-flex items-center gap-1.5 font-semibold text-[var(--c)]"><SpeakerDot color={x.person_color} />{x.person_name || x.speaker_label}</span>
               <span>{x.title || `${fmtDate(x.recorded_at)}, ${fmtClock(x.recorded_at)}`}</span>

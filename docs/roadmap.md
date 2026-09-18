@@ -12,7 +12,6 @@ read from it. Everything here stays local and free. Order is a guess; issues and
   back to a recording, with a confirmation in the app.
 - **Signed, notarized releases** with an auto-updater, and a Homebrew cask.
 - **Templates you can edit in the app**, stored in the library folder instead of inside the app bundle.
-- **Search that finds your summaries, not just your transcripts.** Ask already reads both; Search will too.
 - **Zoom and Google Meet local recordings**, watched automatically like iCloud Drive or Dropbox today.
 - **Obsidian and Markdown export**, one file per recording, so your library is never locked inside Rapport.
 
@@ -33,5 +32,7 @@ read from it. Everything here stays local and free. Order is a guess; issues and
 - Native macOS app with a separate worker process and progress reporting.
 - Summary templates: meeting notes, interview, lecture, sales call, journal or your own prompt, per recording.
 - Ask your library: a question answered from your transcripts, with every claim linked to the moment it came from.
+- Search finds your summaries as well as your transcripts: the sentence that already answers the word you typed comes
+  first, above the turns that led up to it.
 - MCP server: Claude, Cursor and any MCP client can search your recordings and read transcripts, summaries and people,
   read-only, on your Mac. See [integrations.md](integrations.md#mcp-server-your-recordings-inside-claude-cursor-or-any-mcp-client).
