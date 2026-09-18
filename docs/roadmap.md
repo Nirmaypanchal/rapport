@@ -30,9 +30,11 @@ read from it. Everything here stays local and free. Order is a guess; issues and
 - On-device transcription, speaker detection, cross-recording speaker recognition, in-place corrections.
 - Local summaries (Ollama/MLX), search, skip silences, exports.
 - Native macOS app with a separate worker process and progress reporting.
-- Summary templates: meeting notes, interview, lecture, sales call, journal or your own prompt, per recording.
-- Ask your library: a question answered from your transcripts, with every claim linked to the moment it came from.
+- Summary templates: meeting notes, interview, lecture, sales call, journal or your own prompt, per recording or per
+  source — a Granola sync and a voice memo on a walk can take different shapes without you picking each time.
+- Ask your library: a question answered from your transcripts, with every claim linked to the moment it came from,
+  written as the model writes it.
 - Search finds your summaries as well as your transcripts: the sentence that already answers the word you typed comes
   first, above the turns that led up to it.
-- MCP server: Claude, Cursor and any MCP client can search your recordings and read transcripts, summaries and people,
-  read-only, on your Mac. See [integrations.md](integrations.md#mcp-server-your-recordings-inside-claude-cursor-or-any-mcp-client).
+- MCP server: Claude, Cursor and any MCP client can search your recordings, ask them a question, and read transcripts,
+  summaries and people, read-only, on your Mac. See [integrations.md](integrations.md#mcp-server-your-recordings-inside-claude-cursor-or-any-mcp-client).
