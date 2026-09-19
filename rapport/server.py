@@ -15,6 +15,7 @@ from .db import Database
 from .importer import Importer
 from .speakers import next_color
 from .dji import AUDIO_EXT
+from . import sources as source_places  # `sources` is already the name of a route here
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 NEXT_DIR = Path(os.environ.get("RAPPORT_UI_DIR") or (Path(__file__).resolve().parent.parent / "frontend" / "out"))  # `npm run build` output; the desktop shell points RAPPORT_UI_DIR at its bundled copy
@@ -137,20 +138,20 @@ def create_app(library: Library, db: Database, importer: Importer, worker, recor
     # ---- settings ----------------------------------------------------------
 
     def _clean_template_by_source(value) -> dict:
-        """Keep only `source -> a template that exists`. Anything else is dropped rather than stored.
+        """Keep only `place -> a template that exists`. Anything else is dropped rather than stored.
 
+        The key is stored as a place (`mic`, `icloud`, …), which is what the Settings picker offers and what
+        `sources.source_key` resolves a recording to — a mechanism name from an older build is translated here.
         Settings are also a file a user can edit, so this is not the only way a bad entry can arrive — the resolver
         in `summarize.template_for` ignores one too. This just stops the app writing one itself.
         """
-        from .summarize import source_key, templates as summary_templates
+        from .summarize import templates as summary_templates
 
         if not isinstance(value, dict):
             return {}
         ids = {t.id for t in summary_templates(library.settings.summary_custom_prompt)}
-        return {
-            source_key(src): tid for src, tid in value.items()
-            if isinstance(src, str) and src.strip() and isinstance(tid, str) and tid in ids
-        }
+        wanted = {src: tid for src, tid in value.items() if isinstance(tid, str) and tid in ids}
+        return source_places.resolve_by_source(wanted)
 
     @app.put("/api/settings")
     def put_settings(body: SettingsPatch):
@@ -269,25 +270,12 @@ def create_app(library: Library, db: Database, importer: Importer, worker, recor
 
     @app.get("/api/fs/roots")
     def fs_roots():
-        """Cloud-synced folders present on this Mac, for one-click watching."""
-        home = Path.home()
-        cands = [
-            ("icloud", "iCloud Drive", home / "Library/Mobile Documents/com~apple~CloudDocs"),
-            ("dropbox", "Dropbox", home / "Library/CloudStorage/Dropbox"),
-            ("dropbox", "Dropbox", home / "Dropbox"),
-            ("onedrive", "OneDrive", home / "Library/CloudStorage/OneDrive-Personal"),
-            ("downloads", "Downloads", home / "Downloads"),
-            ("desktop", "Desktop", home / "Desktop"),
-        ]
-        for g in sorted((home / "Library/CloudStorage").glob("GoogleDrive-*")):
-            cands.insert(3, ("googledrive", "Google Drive", g / "My Drive"))
-        seen: set[str] = set()
-        out = []
-        for key, label, p in cands:
-            if p.is_dir() and key not in seen:
-                seen.add(key)
-                out.append({"key": key, "label": label, "path": str(p)})
-        return out
+        """Cloud-synced folders present on this Mac, for one-click watching.
+
+        The list itself lives in `rapport/sources.py`, because resolving which of these a watched folder belongs
+        to is also how a recording is filed under a place — one list, so the page and the filing cannot disagree.
+        """
+        return source_places.fs_roots()
 
     @app.get("/api/fs/list")
     def fs_list(path: str):
@@ -430,13 +418,24 @@ def create_app(library: Library, db: Database, importer: Importer, worker, recor
         _mini_cache[rid] = out
         return out
 
+    def _with_place(r: dict, roots: list[dict] | None = None) -> dict:
+        """The recording plus the place it came from, resolved here so the UI looks it up instead of deriving it.
+
+        `source` and `source_volume` are both on the row already; what the UI needs next to a per-source template
+        is the one key those two resolve to (`rapport/sources.py`).
+        """
+        r["source_place"] = source_places.source_key(r.get("source"), r.get("source_volume"), roots)
+        return r
+
     @app.get("/api/recordings")
     def recordings():
         recs = db.list_recordings()
         spk = db.speakers_for_recordings()
+        roots = source_places.cloud_roots()  # asked once for the whole list, not once per recording
         for r in recs:
             r["speakers"] = spk.get(r["id"], [])
             r["peaks_mini"] = _mini_peaks(r["id"]) if r["status"] == "done" else []
+            _with_place(r, roots)
         return recs
 
     @app.get("/api/recordings/{rid}")
@@ -444,6 +443,7 @@ def create_app(library: Library, db: Database, importer: Importer, worker, recor
         r = db.get_recording(rid)
         if not r:
             raise HTTPException(404)
+        _with_place(r)
         r["speakers"] = db.get_speakers(rid)
         r["segments"] = db.get_segments(rid)
         peaks = library.recording_cache(rid) / "peaks.json"
@@ -455,7 +455,8 @@ def create_app(library: Library, db: Database, importer: Importer, worker, recor
     def patch_recording(rid: int, body: RecordingPatch):
         cols = {k: v for k, v in body.model_dump().items() if v is not None}
         db.update_recording(rid, **cols)
-        return db.get_recording(rid)
+        r = db.get_recording(rid)
+        return _with_place(r) if r else None
 
     @app.post("/api/recordings/{rid}/summarize")
     def summarize_recording(rid: int, body: SummarizeBody | None = None):
@@ -490,12 +491,16 @@ def create_app(library: Library, db: Database, importer: Importer, worker, recor
         `sources` is what the library actually holds, so Settings can offer a row per source in use rather than a
         list of every source Rapport can import from. A source with an override set is always in it, even at zero
         recordings, so an override can be seen and cleared.
+
+        Both halves speak *places* (`mic`, `icloud`, …) rather than the `source` column's mechanisms, because this
+        is the one screen where a user picks a source by hand — see `rapport/sources.py`.
         """
         from .summarize import get_template, templates as summary_templates
 
         s = library.settings
         known = summary_templates(s.summary_custom_prompt)
-        by_source = {k: v for k, v in (s.summary_template_by_source or {}).items() if v in {t.id for t in known}}
+        stored = {k: v for k, v in (s.summary_template_by_source or {}).items() if v in {t.id for t in known}}
+        by_source = source_places.resolve_by_source(stored)
         counts = db.source_counts()
         return {
             "templates": [t.to_json() for t in known],

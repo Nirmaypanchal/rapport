@@ -7,6 +7,8 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .sources import cloud_roots, source_key
+
 SCHEMA = """
 PRAGMA journal_mode=WAL;
 PRAGMA foreign_keys=ON;
@@ -569,7 +571,18 @@ class Database:
         return [dict(r) for r in rows]
 
     def source_counts(self) -> dict[str, int]:
-        return {r[0] or "dji": r[1] for r in self.connect().execute("SELECT source, COUNT(*) FROM recordings GROUP BY source")}
+        """How many recordings came from each *place* (`sources.source_key`), not from each mechanism.
+
+        Three watched folders all carry ``source='folder'``, so the group-by asks for the volume too and the
+        counts are folded in Python: two of them may be one iCloud place and the third a Dropbox one.
+        """
+        roots = cloud_roots()
+        out: dict[str, int] = {}
+        rows = self.connect().execute("SELECT source, source_volume, COUNT(*) FROM recordings GROUP BY source, source_volume")
+        for source, volume, n in rows:
+            key = source_key(source, volume, roots)
+            out[key] = out.get(key, 0) + n
+        return out
 
     def stats(self) -> dict:
         c = self.connect()

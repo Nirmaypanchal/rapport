@@ -41,9 +41,29 @@ export function dayKey(iso: string | null | undefined): string {
   return iso ? iso.slice(0, 10) : "unknown";
 }
 
-/** Where a recording came from, in the words the app uses for it. A row written before the column existed is a DJI file. */
+/** Where a recording came from, in the words the app uses for it. A row written before the column existed is a DJI file.
+ *
+ * Takes a *place* (`source_place` on a recording, or a key from `/api/summary/templates`) — the Sources page's own
+ * vocabulary, which is what a user picked from. The `source` column's mechanism names (`microphone`, `file`) are
+ * still here so an older payload reads sensibly, and say the same thing.
+ */
 export function sourceLabel(src: string | null | undefined): string {
-  return { dji: "DJI Mic", voicememos: "Apple Voice Memos", file: "imported file", usb: "USB drive", folder: "watched folder", microphone: "microphone", granola: "Granola", omi: "Omi", notion: "Notion" }[src ?? "dji"] ?? String(src);
+  return {
+    dji: "DJI Mic", voicememos: "Apple Voice Memos", usb: "USB drive", granola: "Granola", omi: "Omi", notion: "Notion",
+    mic: "microphone", files: "imported file", folder: "watched folder",
+    icloud: "iCloud Drive", dropbox: "Dropbox", googledrive: "Google Drive", onedrive: "OneDrive",
+    microphone: "microphone", file: "imported file",
+  }[src ?? "dji"] ?? String(src);
+}
+
+/** The one- or two-syllable tag for a place, for the badge beside a title in the recordings list.
+ *
+ * Empty for the two places that are not worth a badge: a DJI file is the norm, and an imported file says nothing
+ * a user did not already know. Anything unnamed here wears its own key rather than nothing at all.
+ */
+export function sourceTag(place: string | null | undefined): string {
+  if (!place || place === "dji" || place === "files" || place === "file") return "";
+  return { voicememos: "memo", microphone: "mic", googledrive: "drive", icloud: "iCloud" }[place] ?? place;
 }
 
 export function recordingTitle(r: { title?: string | null; recorded_at?: string | null; transmitter?: string | null; original_name: string }): string {
