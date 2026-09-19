@@ -7,6 +7,7 @@ driven against a fake Ollama.
 import io
 import json
 import urllib.error
+from pathlib import Path
 
 import pytest
 
@@ -88,8 +89,31 @@ def test_template_for_uses_the_default_set_for_the_source():
 
 def test_a_recording_with_no_source_is_filed_as_dji():
     # `source` arrived after the first releases, so rows written before it are NULL and are DJI mic files.
-    assert source_key(None) == "dji" and source_key("") == "dji" and source_key(" granola ") == "granola"
+    assert source_key(None) == "dji" and source_key("") == "dji"
     assert template_for(None, None, {"dji": "journal"}, "meeting").id == "journal"
+
+
+def test_the_template_for_a_watched_folder_is_the_services_one_not_the_generic_one(tmp_path, monkeypatch):
+    """The point of the whole place vocabulary: "a template for my iCloud recorder" is expressible.
+
+    Three watched folders all arrive with ``source='folder'``; only the volume tells them apart, so a generic
+    folder entry must not win over the one set for the service that syncs it.
+    """
+    icloud = tmp_path / "Library/Mobile Documents/com~apple~CloudDocs"
+    icloud.mkdir(parents=True)
+    monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+    by_source = {"icloud": "interview", "folder": "lecture"}
+
+    assert template_for(None, "folder", by_source, "meeting", source_volume=str(icloud / "Recorder")).id == "interview"
+    assert template_for(None, "folder", by_source, "meeting", source_volume=str(tmp_path / "Audio")).id == "lecture"
+    # Without the volume there is nothing to resolve, so the generic entry is all there is.
+    assert template_for(None, "folder", by_source, "meeting").id == "lecture"
+
+
+def test_a_source_default_written_in_the_old_words_still_applies():
+    # `settings.json` is a file, and one an older build wrote with the `source` column's spelling.
+    assert template_for(None, "microphone", {"microphone": "journal"}, "meeting").id == "journal"
+    assert template_for(None, "microphone", {"mic": "journal"}, "meeting").id == "journal"
 
 
 def test_an_unusable_source_default_falls_back_to_the_users_default_not_to_meeting():

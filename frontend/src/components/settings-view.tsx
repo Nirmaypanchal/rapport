@@ -113,7 +113,7 @@ export function SettingsView() {
             label="Template by source"
             help={tpl && !tpl.sources.length
               ? "Once you have imported from a source, it appears here and can have a template of its own."
-              : "A Granola sync is a meeting; a voice memo usually is not. A source set here decides the template for new summaries of its recordings — a recording you have picked a template for yourself keeps that one."}
+              : "A Granola sync is a meeting; a voice memo usually is not. Sources are named the way the Sources page names them, so a watched iCloud Drive folder is iCloud Drive rather than a generic folder. A source set here decides the template for new summaries of its recordings — a recording you have picked a template for yourself keeps that one."}
           >
             {tpl?.sources.length ? (
               <div className="grid gap-1.5">

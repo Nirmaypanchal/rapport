@@ -20,6 +20,8 @@ from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
+from .sources import resolve_by_source, source_key
+
 OLLAMA = "http://127.0.0.1:11434"
 MLX_DEFAULT = "mlx-community/Qwen2.5-3B-Instruct-4bit"
 
@@ -189,27 +191,29 @@ def template_for(
     by_source: Mapping[str, str] | None = None,
     default: str | None = None,
     custom_prompt: str = "",
+    source_volume: str | None = None,
 ) -> Template:
     """Which shape a summary takes, deciding between the three places an answer can come from.
 
     The recording's own template wins — it is either an explicit pick in the Summary tab or the shape its last
-    summary was written in. Otherwise the default for the source it came from (a Granola sync is a meeting; a
-    voice memo usually is not). Otherwise the one default in Settings.
+    summary was written in. Otherwise the default for the *place* it came from (a Granola sync is a meeting; a
+    voice memo usually is not; the iCloud folder a recorder app syncs into is whatever that recorder records).
+    Otherwise the one default in Settings.
+
+    ``source`` and ``source_volume`` are the recording's two columns, resolved here by ``sources.source_key`` into
+    the one place-level key the user's map is written in — so a watched iCloud folder reads its own entry rather
+    than the generic ``folder`` one.
 
     A per-source entry naming a template that no longer exists is ignored rather than obeyed: it must fall through
     to the user's own default, not to ``DEFAULT_TEMPLATE``, which is what ``get_template`` would do with it.
     """
     by_id = {t.id: t for t in templates(custom_prompt)}
-    for wanted in (recording_template, (by_source or {}).get(source_key(source))):
+    for_source = resolve_by_source(dict(by_source or {})).get(source_key(source, source_volume))
+    for wanted in (recording_template, for_source):
         t = by_id.get(wanted or "")
         if t is not None and not (t.id == CUSTOM_TEMPLATE and not t.prompt):
             return t
     return get_template(default, custom_prompt)
-
-
-def source_key(source: str | None) -> str:
-    """The key a recording's source is filed under. Rows written before the column existed are DJI mic files."""
-    return (source or "dji").strip() or "dji"
 
 
 def build_system(template: Template) -> str:

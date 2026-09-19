@@ -87,7 +87,7 @@ export function RecordingDetail({ id, seekTo, openTab, onListChanged }: { id: nu
           className="w-full border-b border-transparent bg-transparent font-display text-[22px] font-semibold leading-tight tracking-[-0.02em] outline-none placeholder:text-ink hover:border-hairline focus:border-hairline sm:text-[30px]"
           aria-label="Title"
         />
-        <div className="mt-1 text-[12.5px] text-ink-3">{fmtDate(r.recorded_at)} · {fmtClock(r.recorded_at)} · <span className="tc">{fmtDur(r.duration_sec)}</span>{!hasAudio && <> · text only, from {sourceLabel(r.source)}</>}</div>
+        <div className="mt-1 text-[12.5px] text-ink-3">{fmtDate(r.recorded_at)} · {fmtClock(r.recorded_at)} · <span className="tc">{fmtDur(r.duration_sec)}</span>{!hasAudio && <> · text only, from {sourceLabel(r.source_place ?? r.source)}</>}</div>
 
         {r.status !== "done" && (
           <div className={cn("mt-5 rounded-lg border border-hairline bg-surface px-4 py-4 text-[13.5px]", r.status === "error" ? "text-clip" : "text-ink-2")}>
@@ -161,7 +161,8 @@ function Details({ r }: { r: Recording }) {
   const rows: [string, React.ReactNode][] = [
     ["Recorded", r.recorded_at ? `${fmtDate(r.recorded_at)}, ${fmtClock(r.recorded_at)}` : "Unknown"],
     ["Duration", <span key="d" className="tc">{fmtTime(r.duration_sec)} ({fmtDur(r.duration_sec)})</span>],
-    ["Source", r.source === "dji" || !r.source ? `DJI Mic${r.transmitter ? `, transmitter ${r.transmitter}` : ""}` : sourceLabel(r.source)],
+    // The place, not the mechanism: a file watched out of iCloud Drive says so rather than "watched folder".
+    ["Source", r.source === "dji" || !r.source ? `DJI Mic${r.transmitter ? `, transmitter ${r.transmitter}` : ""}` : sourceLabel(r.source_place ?? r.source)],
     ["File", <span key="f" className="tc break-all">{r.original_name}</span>],
     ["Audio", r.sample_rate ? <span key="a" className="tc">{(r.sample_rate / 1000).toFixed(r.sample_rate % 1000 ? 1 : 0)} kHz</span> : "—"],
     ["Language", r.language ? r.language : "—"],

@@ -218,7 +218,7 @@ function MicPanel({ src, onChange }: { src: Sources; onChange: () => void }) {
         <>Press <b>Record</b>. The first time, macOS asks for microphone access; if it didn't, <button className="underline" onClick={() => openSys("microphone")}>open Microphone privacy settings</button> and allow the app you launched this from.</>,
         <>Press <b>Stop</b>. The take is saved as 48 kHz WAV, transcribed and speaker-tagged like any other recording.</>,
       ]} />
-      <div className="mt-4 text-[12px] text-ink-3">{src.counts.microphone ?? 0} recorded here so far.</div>
+      <div className="mt-4 text-[12px] text-ink-3">{src.counts.mic ?? 0} recorded here so far.</div>
     </div>
   );
 }

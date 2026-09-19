@@ -55,6 +55,10 @@ export type Recording = {
   diarizer: string | null;
   deleted_from_device: number;
   source?: "dji" | "voicememos" | "file" | "usb" | "folder" | "microphone" | "granola" | "omi" | "notion" | null;
+  /** The *place* the two source columns resolve to, filled in by the API: a watched iCloud folder is `icloud`, not
+   * `folder`. This is the vocabulary the Sources page and the per-source templates use; `source` stays the
+   * mechanism. Resolved server-side because only the Mac knows where its iCloud Drive is. */
+  source_place?: string | null;
   source_id?: string | null;
   has_audio?: number | null;
   whisper_model?: string | null;
@@ -134,6 +138,7 @@ export type Sources = {
   voice_memos: Omit<VoiceMemosStatus, "memos">;
   watched_folders: string[];
   connectors: Record<"granola" | "omi" | "notion", { configured: boolean; auto: boolean; last_sync?: string; last_error?: string | null; last_count?: number }>;
+  /** Recordings per place, keyed like the tiles on this page (`mic`, `files`, `icloud`, …), not like `source`. */
   counts: Record<string, number>;
 };
 
@@ -228,15 +233,19 @@ export type SummaryTemplates = {
   templates: SummaryTemplate[];
   /** The default from Settings, already resolved (a "custom" with no prompt written comes back as "meeting"). */
   default: string;
-  /** Defaults set for particular sources; only entries naming a template that exists. */
+  /** Defaults set for particular places; only entries naming a template that exists. Keyed like `source_place`. */
   by_source: Record<string, string>;
-  /** The sources this library holds recordings from, most first, plus any that carry an override. */
+  /** The places this library holds recordings from, most first, plus any that carry an override. */
   sources: { id: string; count: number }[];
 };
 
-/** The template a recording without one of its own will be summarized with: its source's default, else the default. */
-export function defaultTemplateFor(source: string | null | undefined, tpl: SummaryTemplates | undefined): string {
-  return tpl ? (tpl.by_source?.[source || "dji"] ?? tpl.default) : "";
+/** The template a recording without one of its own will be summarized with: its place's default, else the default.
+ *
+ * Pass `source_place`, not `source` — the map is keyed by place, and only the backend can tell which watched
+ * folder is iCloud's.
+ */
+export function defaultTemplateFor(place: string | null | undefined, tpl: SummaryTemplates | undefined): string {
+  return tpl ? (tpl.by_source?.[place || "dji"] ?? tpl.default) : "";
 }
 
 export class ApiError extends Error {

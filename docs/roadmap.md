@@ -31,7 +31,9 @@ read from it. Everything here stays local and free. Order is a guess; issues and
 - Local summaries (Ollama/MLX), search, skip silences, exports.
 - Native macOS app with a separate worker process and progress reporting.
 - Summary templates: meeting notes, interview, lecture, sales call, journal or your own prompt, per recording or per
-  source — a Granola sync and a voice memo on a walk can take different shapes without you picking each time.
+  source — a Granola sync and a voice memo on a walk can take different shapes without you picking each time. Sources
+  are named by where a recording came from, so a watched iCloud Drive or Dropbox folder is set separately from any
+  other folder you watch.
 - Ask your library: a question answered from your transcripts, with every claim linked to the moment it came from,
   written as the model writes it.
 - Search finds your summaries as well as your transcripts: the sentence that already answers the word you typed comes

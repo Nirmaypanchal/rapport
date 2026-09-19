@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
@@ -188,6 +189,52 @@ def test_summary_templates_list_the_sources_in_the_library(library, db):
     assert [s["id"] for s in body["sources"]] == ["granola", "voicememos"], "the most-used source first"
     assert body["sources"][0]["count"] == 2
     assert body["by_source"] == {}, "nothing is defaulted for a source until the user says so"
+
+
+def test_fs_roots_lists_what_is_on_this_mac(library, db, tmp_path, monkeypatch):
+    # The same list that resolves a watched folder to its service, so the Sources page and the filing agree.
+    (tmp_path / "Library/Mobile Documents/com~apple~CloudDocs").mkdir(parents=True)
+    (tmp_path / "Desktop").mkdir()
+    monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+
+    roots = _client(library, db).get("/api/fs/roots").json()
+    assert [(r["key"], r["label"]) for r in roots] == [("icloud", "iCloud Drive"), ("desktop", "Desktop")]
+    assert roots[0]["path"] == str(tmp_path / "Library/Mobile Documents/com~apple~CloudDocs")
+
+
+def test_the_sources_offered_are_places_not_the_mechanism_column(library, db, tmp_path, monkeypatch):
+    """Settings offers a row per *place*, which is what the user picked on the Sources page.
+
+    Two watched folders under iCloud Drive are one iCloud row, not two `folder` ones; a third folder that is
+    nobody's stays generic; and `microphone` is offered under the name the Sources page gives its tile.
+    """
+    icloud = tmp_path / "Library/Mobile Documents/com~apple~CloudDocs"
+    icloud.mkdir(parents=True)
+    monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+    for i, (source, volume) in enumerate([
+        ("folder", str(icloud / "Recorder")),
+        ("folder", str(icloud / "Meetings")),
+        ("folder", str(tmp_path / "Elsewhere")),
+        ("microphone", "microphone"),
+    ]):
+        db.insert_recording(sha256=str(i) * 64, original_name=f"{i}.wav", rel_path=f"audio/{i}.wav", source=source, source_volume=volume)
+
+    body = _client(library, db).get("/api/summary/templates").json()
+    assert [(s["id"], s["count"]) for s in body["sources"]] == [("icloud", 2), ("folder", 1), ("mic", 1)]
+
+
+def test_a_recording_carries_the_place_it_came_from(library, db, tmp_path, monkeypatch):
+    # The UI reads the resolved key back rather than re-deriving it: only this Mac knows where its iCloud Drive is.
+    icloud = tmp_path / "Library/Mobile Documents/com~apple~CloudDocs"
+    icloud.mkdir(parents=True)
+    monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+    rid = db.insert_recording(sha256="f" * 64, original_name="f.wav", rel_path="audio/f.wav", source="folder", source_volume=str(icloud / "Recorder"))
+    c = _client(library, db)
+
+    assert c.get("/api/recordings").json()[0]["source_place"] == "icloud"
+    assert c.get(f"/api/recordings/{rid}").json()["source_place"] == "icloud"
+    assert c.patch(f"/api/recordings/{rid}", json={"title": "Standup"}).json()["source_place"] == "icloud"
+    assert c.get(f"/api/recordings/{rid}").json()["source"] == "folder", "the mechanism column is untouched"
 
 
 def test_a_source_default_round_trips_and_is_cleaned(library, db):

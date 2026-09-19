@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { Recording, Speaker } from "@/lib/api";
-import { fmtClock, fmtDay, fmtTime, dayKey, recordingTitle } from "@/lib/format";
+import { fmtClock, fmtDay, fmtTime, dayKey, recordingTitle, sourceTag } from "@/lib/format";
 import { speakerGlyph, speakerName } from "@/lib/speakers";
 import { SpeakerAvatar } from "@/components/avatar";
 import { Input } from "@/components/ui/input";
@@ -55,6 +55,7 @@ export function RecordingList({ recordings, activeId }: { recordings: Recording[
           const who = speakerLine(r);
           const pct = r.status === "processing" && typeof r.progress === "number" ? Math.round(r.progress * 100) : null;
           const status = r.status !== "done" ? (r.status === "processing" ? `${r.stage || "processing"}${pct != null ? ` · ${pct}%` : ""}` : r.status) : null;
+          const tag = sourceTag(r.source_place ?? r.source);  // the place, so a watched iCloud folder says so
           return (
             <div key={r.id}>
               {header}
@@ -65,7 +66,7 @@ export function RecordingList({ recordings, activeId }: { recordings: Recording[
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 text-[14px] font-semibold leading-5">
                     <span className="truncate">{r.title || fmtClock(r.recorded_at) || r.original_name}</span>
-                    {r.source && r.source !== "dji" && r.source !== "file" && <span className="tc shrink-0 rounded-[3px] bg-surface-2 px-1 text-[10px] font-medium text-ink-3">{{ voicememos: "memo", usb: "usb", folder: "folder", microphone: "mic", granola: "granola", omi: "omi", notion: "notion" }[r.source]}</span>}
+                    {tag && <span className="tc shrink-0 rounded-[3px] bg-surface-2 px-1 text-[10px] font-medium text-ink-3">{tag}</span>}
                   </div>
                   <div className="mt-px truncate text-[12.5px] leading-4 text-ink-2">
                     {status ? (

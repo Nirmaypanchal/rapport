@@ -18,8 +18,8 @@ export function SummaryTab({ r, onChange }: { r: Recording; onChange: () => void
   const [picked, setPicked] = useState<string | null>(null);
   const busy = r.summary_status === "queued" || r.summary_status === "running";
   // What the button will use, and the same chain the backend resolves: the pick made here, else this recording's
-  // own template, else the default for the source it came from, else the one default in Settings.
-  const template = picked ?? r.summary_template ?? defaultTemplateFor(r.source, tpl);
+  // own template, else the default for the place it came from, else the one default in Settings.
+  const template = picked ?? r.summary_template ?? defaultTemplateFor(r.source_place ?? r.source, tpl);
   const chosen = tpl?.templates.find((t) => t.id === template);
   // Worth saying only when the source is the reason: a default the user set once, on a page they are not looking at.
   const fromSource = !picked && !r.summary_template && !!tpl && template !== tpl.default;
@@ -44,7 +44,7 @@ export function SummaryTab({ r, onChange }: { r: Recording; onChange: () => void
           <Sparkles className="size-3.5" />{busy ? "Working…" : r.summary ? "Regenerate" : "Summarize"}
         </Button>
         {chosen?.description && <span className="w-full text-[12px] text-ink-3 sm:w-auto">{chosen.description}</span>}
-        {fromSource && <span className="w-full text-[12px] text-ink-3">Your default for {sourceLabel(r.source)}.</span>}
+        {fromSource && <span className="w-full text-[12px] text-ink-3">Your default for {sourceLabel(r.source_place ?? r.source)}.</span>}
       </div>
       {stale && !busy && (
         <div className="mb-3 rounded-lg border border-dashed border-hairline px-4 py-2.5 text-[12.5px] text-ink-2">

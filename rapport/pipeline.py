@@ -309,11 +309,13 @@ class Worker:
             self.db.update_recording(rid, summary_status="running")
             try:
                 s = self.library.settings
-                # The recording's own choice wins, then the default for the source it came from, then the one in
-                # Settings — resolved now and recorded with the summary so the UI can show which shape wrote it.
+                # The recording's own choice wins, then the default for the place it came from (source and volume
+                # together: a watched iCloud folder is iCloud, not "folder"), then the one in Settings — resolved
+                # now and recorded with the summary so the UI can show which shape wrote it.
                 template = template_for(
                     rec.get("summary_template"), rec.get("source"),
                     s.summary_template_by_source, s.summary_template, s.summary_custom_prompt,
+                    source_volume=rec.get("source_volume"),
                 )
                 names = {sp["label"]: (sp["person_name"] or sp.get("display_name") or sp["label"]) for sp in self.db.get_speakers(rid)}
                 text = summarize(self.db.get_segments(rid), names, provider, model, rec.get("title") or rec["original_name"], template)

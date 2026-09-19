@@ -6,6 +6,12 @@ All notable changes to Rapport. The format follows Keep a Changelog; versions fo
 
 ### Added
 
+- **Sources are named by where a recording came from.** A watched folder inside iCloud Drive, Dropbox, Google Drive
+  or OneDrive is now listed as that service rather than as a generic "watched folder", everywhere you pick a source:
+  Settings → Template by source, the counts on the Sources page, and a recording's Details panel. Three watched
+  folders used to arrive as one indistinguishable source, so "a template for my iCloud recorder" could not be
+  expressed; now it can. Nothing about how a file is imported changed, and existing settings keep working.
+
 - **Search finds your summaries, not just your transcripts.** Typing "pricing" used to search the words people said
   and miss the summary that states the answer in one sentence. Summary hits now lead the results, each with a
   **Summary** badge and the block's heading instead of a timestamp, and open that recording's Summary tab.
