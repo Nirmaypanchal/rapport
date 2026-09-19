@@ -19,7 +19,10 @@
 - No Apple silicon, no Metal, no MLX. `uv sync` works because `mlx-whisper` and `mlx-lm` carry `sys_platform == 'darwin'` markers;
   `scripts/test-light.sh` avoids even that by creating `.venv-light` with only the light dependencies.
 - Frontend: `cd frontend && npm ci && npx tsc --noEmit && npm run build`.
-- CI on a `sprint/*` push takes 3 to 6 minutes. The Sprint merge workflow runs right after CI. If the repository setting
+- CI on a `sprint/*` push takes **about a minute** — 42 s for the whole run on 2026-09-19 (`backend-light` 16 s,
+  `frontend` 38 s, the full macOS `backend` 30 s, all in parallel), not the 3 to 6 minutes this line used to claim.
+  Worth knowing before you plan to do something else while it runs: by the time you have written a board entry it has
+  merged. The Sprint merge workflow runs right after CI. If the repository setting
   "Allow GitHub Actions to create and approve pull requests" is off, the workflow's `gh pr create` fails and nothing merges;
   then open and merge the PR yourself with the GitHub tools once CI is green (PR #1 was merged that way).
 - Pushes by the merge workflow do not trigger other workflows; pushes by agents do.

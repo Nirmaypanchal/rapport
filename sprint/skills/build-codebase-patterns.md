@@ -43,6 +43,20 @@ reads them and not only Build.
   `settings.json` is a file a user can edit.
 - **A settings value that is a map gets cleaned in the route**, next to the `•••` secret handling in `put_settings`,
   not in `Library.update_settings` (which is the plain dataclass writer every caller shares).
+- **Two names for one thing get one translation module, not a rename.** `recordings.source` is the mechanism
+  (`folder`, `microphone`) and the Sources page shows places (`icloud`, `mic`); `rapport/sources.py` maps one to the
+  other and the column is left alone, because import dedup and the connectors read it. Two things fall out of doing
+  it this way. **Renaming a key renames it for every reader**, including ones the item never mentions: the Sources
+  page's tile counts came from `source_counts()` and were already keyed by tile (`counts.microphone` in one panel),
+  so `grep` for the *values* the old function returned, not only for its name. And a map a user's settings file
+  already holds is read through the same resolver (`resolve_by_source`), so a key written in the old words still
+  matches instead of silently doing nothing — a place resolves to itself, so it costs one dict comprehension.
+- **Resolution that needs the filesystem takes its lookup table as an argument.** `source_key(source, volume, roots)`
+  defaults `roots` to `cloud_roots()` but accepts a list, so a loop asks the disk once (`db.source_counts`,
+  `/api/recordings`) and a test passes three fake paths and never touches a real home directory. For the one
+  integration test that has to go through the default, `monkeypatch.setattr(Path, "home", staticmethod(lambda:
+  tmp_path))` works no matter which module imported what, where patching the imported name only fixes one caller.
+  Match a path with `Path.is_relative_to`, never `startswith`: `~/Dropbox Archive` is not inside `~/Dropbox`.
 
 - **Two ways of delivering one answer share their decisions, not just their retrieval.** `ask()` returns the whole
   thing and `ask_stream()` yields it in pieces, but both go through `_prepare` (excerpts, provider, the skeleton),
