@@ -12,18 +12,14 @@ Ordered. The Build agent takes the first unchecked item under **Now**. See [READ
 > questions Build asked in `messages.md` (MCP write-back scope, the Search results view, source vocabulary) — the
 > reasoning for each is in `sprint/decisions.md`, dated 2026-09-14.
 
-> **Build, 2026-09-19:** **One vocabulary for sources** is in Done below ([#28](https://github.com/Nirmaypanchal/rapport/pull/28)). The spec held; the
-> one thing it did not see coming is on the board under Next — renaming the keys `db.source_counts()` returns also
-> renamed them for the **Sources page's own tile counts**, which had been keyed by tile (`counts.microphone` in the
-> mic panel) and reading zero since the page was built. That is fixed here, but it is the lesson: an item that
-> changes what a function *returns* has readers the item does not name. The top of Now is **Zoom / Google Meet
-> local recordings** (S), fully specified, and a OneDrive tile beside it would now be one more line in the same list.
+> **Build, 2026-09-20:** **Zoom / Google Meet local recordings** is in Done below ([#29](https://github.com/Nirmaypanchal/rapport/pull/29)), with the
+> **OneDrive tile** from Next folded into the same branch as the previous run suggested. The one place the spec
+> aimed at a file that had moved: it named `server.py`'s `fs_roots` for the new candidate, but [#28](https://github.com/Nirmaypanchal/rapport/pull/28) moved that list
+> into `rapport/sources.py` the day before — and the bigger call the spec left implicit was *which* list. A tile
+> whose folder is not a place resolves to the generic `folder`, which is exactly the zero-count bug #28 fixed, so
+> Zoom went into the place list (`cloud_roots()` is now `place_roots()`) and a Zoom meeting is filed under `zoom`.
+> The top of Now is **Obsidian and Markdown export of the whole library** (S), fully specified.
 
-- [ ] **Zoom / Google Meet local recordings** — watch their default folders, the same one-click way iCloud Drive or Dropbox already work. _Why:_ Zoom and Google Meet are two of the most common sources of recordings for exactly the people Rapport is for, and the watched-folder mechanism already exists — this is a detection gap, not a new feature. _Size:_ S.
-  - User story: as a Zoom user, I want Rapport to notice the folder Zoom already saves my local recordings to, instead of me having to browse to it myself.
-  - Acceptance: `/api/fs/roots` (`server.py`) gains one more candidate, `("zoom", "Zoom", home / "Documents/Zoom")`, following the exact pattern already used for iCloud/Dropbox/OneDrive. `sources-view.tsx`'s `INTEGRATIONS` gains a `zoom` tile reusing `FolderPanel` exactly like `icloud`/`dropbox`/`googledrive` do — no new panel code, just one more case in `state()` and the tile list. Google Meet recordings land inside Google Drive's "Meet Recordings" folder once Drive sync is on, which the existing Google Drive tile already reaches — add one sentence to that tile's blurb pointing at the subfolder rather than building a second detection path for a folder inside a folder Rapport already finds.
-  - UI notes: identical dialog and "Watch this folder" flow as the existing cloud-folder tiles.
-  - Files likely touched: `rapport/server.py` (`fs_roots`), `frontend/src/components/sources-view.tsx` (`INTEGRATIONS`, `SourceId`, `state()`).
 - [ ] **Obsidian and Markdown export of the whole library** — one folder of `.md` per recording, so a library isn't locked inside Rapport's database. _Why:_ the most-requested shape of "let me take my data with me" for a local-first tool, and Rapport already has every ingredient (transcript, summary, speakers) in SQLite. _Size:_ S.
   - User story: as someone who wants their notes in Obsidian, or just a folder of files I own outside Rapport, I want one action that writes every recording out as Markdown.
   - Acceptance: a new route (e.g. `POST /api/export/markdown`) writes one `.md` file per recording into a folder the user picks — title, date, speakers, the summary if any, then the transcript with speaker labels and timestamps — named from the recording's title/date. Runs once, on demand; no watching, no ongoing sync, nothing in the library is modified. A test asserts file count matches recording count and that title/summary/transcript content round-trips into the written files.
@@ -68,13 +64,16 @@ Ordered. The Build agent takes the first unchecked item under **Now**. See [READ
   acceptance criteria said "capped at 5" and nothing about spreading. **Whether that is wrong is a guess, not a
   finding**: for a search box, seeing every place a word appears inside one summary may be exactly what is wanted,
   where for an answer it is not. Needs a look at a real library before it is a change. _Size:_ S.
-- [ ] **OneDrive is offered by `/api/fs/roots` and has no tile on the Sources page** — the route has returned an
-  `onedrive` root since the page was built and `sources-view.tsx`'s `INTEGRATIONS` has no case for it, so the only
-  way to watch a OneDrive folder is to browse to it through the generic folder tile. _Why:_ found while building the
-  place vocabulary ([#28](https://github.com/Nirmaypanchal/rapport/pull/28)), where OneDrive now resolves as a place — so its recordings are *filed*
-  under `onedrive` (and can have their own summary template) while its folders are still *managed* under "watched
-  folder". Neither half is wrong, but the two pages say different things about the same folder. _Size:_ S — this is
-  the same one-tile-plus-one-`state()`-case change as the Zoom item above, and the two are worth doing together.
+- [ ] **A video file is not importable at all, so a Zoom meeting recorded without its separate audio file is
+  invisible** — `AUDIO_EXT` (`rapport/dji.py`) holds seven audio extensions and no video ones, so `.mp4`, `.mov` and
+  `.webm` are skipped everywhere: the watched-folder scan, a dropped file, a USB volume. _Why:_ found while building
+  the Zoom tile ([#29](https://github.com/Nirmaypanchal/rapport/pull/29)). Zoom writes `zoom_0.mp4` beside an `.m4a`, so watching the folder normally works —
+  but a screen recording, a QuickTime capture, a downloaded Meet or Teams file, or a Zoom configured to keep only the
+  video all arrive as nothing at all, with no error and no row. ffmpeg is already a dependency and already re-encodes
+  every import (`rapport/audio.py`), so extracting the audio track is a small function; the real questions are
+  whether the original video is copied into the library or only its audio (disk, and "originals are never touched"),
+  and what the Recordings list says a video-backed recording is. _Size:_ M. **A guess, not a finding:** that people
+  hit this — nobody has reported it, and it is inferred from the code plus how Zoom writes, not from a user.
 - [ ] **The Sources tiles could show how many recordings each place holds** — `db.source_counts()` is now keyed by
   tile id, so `counts.icloud` and `counts.mic` mean something for the first time. Today only the mic panel and the
   three connector panels show a count; every other tile shows a state word alone. _Why:_ found while building the
@@ -93,6 +92,7 @@ Ordered. The Build agent takes the first unchecked item under **Now**. See [READ
 
 ## Done
 
+- [x] Zoom, Google Meet and OneDrive are one click each (2026-09-20, [#29](https://github.com/Nirmaypanchal/rapport/pull/29)) — a **Zoom** tile that opens at `~/Documents/Zoom` (one watch covers every meeting: the folder scan recurses and Zoom writes one folder per meeting), a **OneDrive** tile for the root `/api/fs/roots` has answered since the page was built, and Google Meet through the Google Drive tile it already belongs to, pointed at the `Meet Recordings` subfolder. Zoom is a *place*, not a browse shortcut, so `cloud_roots()` became `place_roots()` and a Zoom meeting is filed under `zoom` with a summary template of its own. Beside it: the tile ids that were written out in three places in `sources-view.tsx` are one `FOLDER_PLACES` list, and the page now decides what is inside a root the way the backend does (at a separator, not `startsWith`)
 - [x] One vocabulary for sources: a recording is filed under the *place* it came from (2026-09-19, [#28](https://github.com/Nirmaypanchal/rapport/pull/28)) — `rapport/sources.py` is the one translation between the `source` column's mechanisms and the Sources page's places, and the column is untouched. A watched folder resolves to the service that syncs it by matching the stored watched path against the same cloud-root list `/api/fs/roots` answers, so two iCloud folders are one `icloud` source and "a template for my iCloud recorder" is expressible. `source_place` rides on every recording payload, so the UI looks the place up instead of re-deriving it — only the Mac knows where its iCloud Drive is
 - [x] The Search page finds summaries too (2026-09-18, [#27](https://github.com/Nirmaypanchal/rapport/pull/27)) — `GET /api/search` answers `{moments, summaries}`, two arrays because two bm25 rankings are not one; summaries lead the results list with the `FileText` badge and the block's heading instead of a timestamp, and the summary card is now one shared component (`frontend/src/components/summary-hit.tsx`) that Ask and Search both render, so the two lists cannot drift. The non-obvious cost of the shape change was `scripts/e2e.py`, which calls the route and is typechecked by nothing
 - [x] Make `sprint-merge` fail loudly: no `|| true`, no shell logic, and a step that cannot quietly do nothing (2026-09-17, [#25](https://github.com/Nirmaypanchal/rapport/pull/25)) — the open/merge/hold decision is in `scripts/sprint_merge.py` beside the pruning; a failing `gh` fails the step, a create is followed by asking whether a pull request exists, reaching the merge with none is an error, and the merge step lost its `if:` so it decides for every conclusion. Verified on a real red branch and a real green one, not only in tests

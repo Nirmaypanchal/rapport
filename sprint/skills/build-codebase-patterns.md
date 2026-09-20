@@ -1,4 +1,4 @@
-# Patterns that work in this codebase (Last verified: 2026-09-18, Build)
+# Patterns that work in this codebase (Last verified: 2026-09-20, Build)
 
 Read before writing code. These are things the codebase already decided; following them keeps a diff small and reviewable.
 
@@ -52,7 +52,7 @@ reads them and not only Build.
   already holds is read through the same resolver (`resolve_by_source`), so a key written in the old words still
   matches instead of silently doing nothing — a place resolves to itself, so it costs one dict comprehension.
 - **Resolution that needs the filesystem takes its lookup table as an argument.** `source_key(source, volume, roots)`
-  defaults `roots` to `cloud_roots()` but accepts a list, so a loop asks the disk once (`db.source_counts`,
+  defaults `roots` to `place_roots()` but accepts a list, so a loop asks the disk once (`db.source_counts`,
   `/api/recordings`) and a test passes three fake paths and never touches a real home directory. For the one
   integration test that has to go through the default, `monkeypatch.setattr(Path, "home", staticmethod(lambda:
   tmp_path))` works no matter which module imported what, where patching the imported name only fixes one caller.
@@ -121,6 +121,23 @@ reads them and not only Build.
   `dim` flag, Search hands it neither. The alternative — a `kind`/`mode` prop, or copying the classes — is how the
   two lists come to disagree about what a summary hit looks like. The signal that an extraction is right: the shared
   component has no conditional that names a caller.
+- **A new tile on the Sources page is a new *place*, or it is a tile that counts nothing.** `rapport/sources.py`
+  holds two lists and they are not interchangeable: `fs_roots()` is browse shortcuts (Downloads, Desktop) and
+  `place_roots()` is what a watched folder is *filed* under. A root in the first gives the tile somewhere to open;
+  only the second makes its recordings say where they came from and makes a per-source template expressible. Zoom
+  went in the second, which is why the list is no longer called `cloud_roots` — an app's own folder is a place too.
+  The test for "which list": could a user want a summary template for it?
+- **When a set of ids is named in more than one place in a component, make it a `const` before you add to it.**
+  `sources-view.tsx` listed the folder-backed tiles in the panel dispatch, in `state()`, and in the "Any folder"
+  tile's filter, which subtracts them from the watched list — so a fourth tile would have counted under its own
+  tile *and* under "Any folder", and the panel's "X is not set up on this Mac" would have named the wrong service.
+  One `FOLDER_PLACES` (`as const satisfies readonly SourceId[]`) and a `name` prop fixed both. The narrowing
+  gotcha: `case "a": case "b":` narrows a union, a helper does not — write it as a type guard
+  (`(id: SourceId | null): id is (typeof FOLDER_PLACES)[number]`) or `tsc` rejects the call that used to narrow.
+- **`startsWith` is the wrong question on both sides of the wire.** The page decided which tile owned a watched
+  folder with `f.startsWith(root.path)` while the backend used `Path.is_relative_to` — so `~/Dropbox Archive` was
+  Dropbox's on the Sources page and nobody's on the recording. Compare at a separator (`f === root ||
+  f.startsWith(root + "/")`). Any rule the backend implements carefully is worth grepping for in `frontend/src`.
 - **`frontend/AGENTS.md` is generated, and its claim checks out.** `next dev` writes that block (verified 2026-09-18:
   `node_modules/next/dist/server/lib/generate-agent-files.js` and `node_modules/next/dist/docs/` both exist after
   `npm ci`). So read `node_modules/next/dist/docs/` before using a Next.js API you are recalling rather than reading,

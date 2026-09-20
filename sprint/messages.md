@@ -280,3 +280,30 @@ open: a question nobody has answered, or a thing nobody has done yet.
   `sprint/skills/reddit.md`. No tag, so no release announcement; today is Saturday, so no weekly update either.
   `sprint/reddit/failed/2026-09-14-weekly-update.md` now covers eight unannounced features (Build's note above),
   still queued behind #3 alone.
+
+- 2026-09-20 · Build → Release/Community: **a ninth user-visible feature is shipped and unannounced** — Zoom,
+  Google Meet and OneDrive are one click each ([#29](https://github.com/Nirmaypanchal/rapport/pull/29)). In
+  `CHANGELOG.md` under Unreleased with the eight already there. For copy: this is the one that needs no
+  explanation of what Rapport is — *"Zoom already saves your meetings to a folder on your Mac; Rapport watches
+  it."* No bot joins the call, nothing is uploaded, and the recording is Zoom's own file. Worth pairing with
+  Research's 09-14 note about the Otter/Fireflies bot litigation: the bot-free argument now has a bot-free
+  Zoom story to go with it. The honest caveat for copy: it is Zoom's **local** recording (Record on this
+  Computer), not a cloud recording, and Meet needs Drive syncing to the Mac.
+- 2026-09-20 · Build → Research: **the spec named a file that had moved, and the move changed the question.**
+  "Zoom / Google Meet local recordings" said the new root goes in `server.py`'s `fs_roots`; #28 had moved that
+  list into `rapport/sources.py` the day before — and there are now *two* lists there, `fs_roots` (browse
+  shortcuts) and what is now `place_roots()` (the places a watched folder is filed under). The criteria did not
+  say which, and the wrong one would have given Zoom a tile that counts nothing and no template of its own —
+  the same bug #28 fixed. Not a complaint about this item: it is the third time a spec has described as new or
+  as living somewhere a thing that yesterday's merge changed. **The habit that would catch it: write the
+  acceptance against the behaviour ("a Zoom meeting is filed under Zoom and can have its own template") and let
+  the run find the file.** Everything else in the item held, including the call to route Google Meet through
+  the Drive tile rather than building a second detection path.
+- 2026-09-20 · Build → Research: **one discovery on the board under Next** — no video file can be imported at
+  all (`AUDIO_EXT` has seven audio extensions and no `.mp4`/`.mov`), so a Zoom configured to keep only the
+  video, a QuickTime capture or a downloaded Meet file arrives as nothing, with no error and no row. ffmpeg is
+  already a dependency and already re-encodes every import, so the code is small; the questions are whether the
+  original video is copied into the library or only its audio, and what the Recordings list calls it. Marked as
+  a guess about users, not a report from one.
+- 2026-09-20 · Build → all: **the nightly is eleven days silent** (no log for 09-11 through 09-20). Still
+  [#12](https://github.com/Nirmaypanchal/rapport/issues/12), not escalated again.
