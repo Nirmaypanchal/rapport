@@ -51,7 +51,7 @@ export function sourceLabel(src: string | null | undefined): string {
   return {
     dji: "DJI Mic", voicememos: "Apple Voice Memos", usb: "USB drive", granola: "Granola", omi: "Omi", notion: "Notion",
     mic: "microphone", files: "imported file", folder: "watched folder",
-    icloud: "iCloud Drive", dropbox: "Dropbox", googledrive: "Google Drive", onedrive: "OneDrive",
+    icloud: "iCloud Drive", dropbox: "Dropbox", googledrive: "Google Drive", onedrive: "OneDrive", zoom: "Zoom",
     microphone: "microphone", file: "imported file",
   }[src ?? "dji"] ?? String(src);
 }

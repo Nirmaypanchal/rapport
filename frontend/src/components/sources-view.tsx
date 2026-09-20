@@ -2,8 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
-import { siApple, siBluetooth, siDji, siDropbox, siGoogledrive, siIcloud, siNotion } from "simple-icons";
-import { ChevronRight, Circle, Download, FolderOpen, HardDrive, Mic, Square, Upload, Watch } from "lucide-react";
+import { siApple, siBluetooth, siDji, siDropbox, siGoogledrive, siIcloud, siNotion, siZoom } from "simple-icons";
+import { ChevronRight, Circle, Cloud, Download, FolderOpen, HardDrive, Mic, Square, Upload, Watch } from "lucide-react";
 import { API, TOKEN, api, fetcher, uploadFiles, type Settings, type Sources, type VoiceMemosStatus } from "@/lib/api";
 import { fmtClock, fmtDate, fmtDur, fmtTime } from "@/lib/format";
 import { useStatus } from "@/lib/use-status";
@@ -43,12 +43,19 @@ function BrandMark({ mark, size = 44 }: { mark: Mark; size?: number }) {
 }
 
 /* ---------------------------------------------------------------- catalogue */
-type SourceId = "dji" | "usb" | "mic" | "voicememos" | "omi" | "granola" | "notion" | "icloud" | "dropbox" | "googledrive" | "folder" | "files";
-type Tile = { id: SourceId; name: string; mark: Mark; blurb: string };
+type SourceId = "dji" | "usb" | "mic" | "voicememos" | "omi" | "granola" | "notion" | "zoom" | "icloud" | "dropbox" | "googledrive" | "onedrive" | "folder" | "files";
+type Tile = { id: SourceId; name: string; mark: Mark; blurb: string; hint?: React.ReactNode };
+
+/* The tiles whose panel is a folder browser rooted at a place `/api/fs/roots` answers. Every one of them is a key
+   `sources.place_roots()` returns, so a folder watched here is also *filed* under this tile on a recording and in
+   Settings → Template by source. Adding a tile means adding its root there and its id here — and nowhere else:
+   `state()` and the generic "Any folder" tile both read this list rather than naming the services again. */
+const FOLDER_PLACES = ["icloud", "dropbox", "googledrive", "onedrive", "zoom"] as const satisfies readonly SourceId[];
+const isFolderPlace = (id: SourceId | null): id is (typeof FOLDER_PLACES)[number] => !!id && (FOLDER_PLACES as readonly string[]).includes(id);
 
 const DEVICES: Tile[] = [
   { id: "dji", name: "DJI Mic", mark: si(siDji), blurb: "Transmitters over USB. New recordings are copied in." },
-  { id: "usb", name: "USB recorder or SD card", mark: { kind: "icon", icon: HardDrive }, blurb: "Zoom, Tascam, Sony, any drive with audio." },
+  { id: "usb", name: "USB recorder or SD card", mark: { kind: "icon", icon: HardDrive }, blurb: "Tascam, Sony, Zoom H-series, any drive with audio." },
   { id: "mic", name: "Microphone & Bluetooth", mark: si(siBluetooth), blurb: "Record from AirPods, a USB mic, or the Mac." },
   { id: "voicememos", name: "Apple Voice Memos", mark: app("voicememos", si(siApple)), blurb: "Mac, iPhone and Apple Watch memos via iCloud." },
   { id: "omi", name: "Omi", mark: { kind: "icon", icon: Circle }, blurb: "Conversations from the Omi pendant." },
@@ -56,9 +63,17 @@ const DEVICES: Tile[] = [
 const INTEGRATIONS: Tile[] = [
   { id: "granola", name: "Granola", mark: app("granola", file("granola.svg")), blurb: "Meeting notes, transcripts and summaries." },
   { id: "notion", name: "Notion AI Meeting Notes", mark: app("notion", si(siNotion)), blurb: "Pages with Notion's meeting notes block." },
+  {
+    id: "zoom", name: "Zoom", mark: app("zoom", si(siZoom)), blurb: "The meetings you record to this Mac.",
+    hint: <>Zoom saves a local recording to <span className="tc">~/Documents/Zoom</span>, one folder per meeting, once you press <b>Record</b> → <b>Record on this Computer</b>. Watching that one folder picks up every meeting, now and later. Recording to the cloud instead leaves nothing here; download the file and drop it on the Recordings list.</>,
+  },
   { id: "icloud", name: "iCloud Drive", mark: si(siIcloud), blurb: "Watch a folder your phone recorder saves to." },
   { id: "dropbox", name: "Dropbox", mark: si(siDropbox), blurb: "Watch a synced folder." },
-  { id: "googledrive", name: "Google Drive", mark: si(siGoogledrive), blurb: "Watch a synced folder." },
+  {
+    id: "googledrive", name: "Google Drive", mark: si(siGoogledrive), blurb: "Watch a synced folder, Google Meet's included.",
+    hint: <>Google Meet puts what it records in <span className="tc">Meet Recordings</span> inside your Drive folder, so browse to that subfolder to bring in Meet calls rather than watching the whole Drive.</>,
+  },
+  { id: "onedrive", name: "OneDrive", mark: { kind: "icon", icon: Cloud }, blurb: "Watch a synced folder." },
   { id: "folder", name: "Any folder", mark: { kind: "icon", icon: FolderOpen }, blurb: "Watch a folder on this Mac." },
   { id: "files", name: "Files & exports", mark: { kind: "icon", icon: Upload }, blurb: "Otter, Plaud, Pocket exports, or any audio file." },
 ];
@@ -88,7 +103,11 @@ export function SourcesView() {
   if (!status || !s || !src) return <div className="p-10 text-center text-[13px] text-ink-3">Loading…</div>;
   const c = src.counts;
   const rootOf = (key: string) => roots?.find((r) => r.key === key);
-  const watching = (key: string) => { const r = rootOf(key); return r ? s.watched_folders.filter((f) => f.startsWith(r.path)) : []; };
+  // A path is inside a root only at a separator — "~/Dropbox Archive" is not inside "~/Dropbox". The backend
+  // resolves the same question with `Path.is_relative_to` (`rapport/sources.py`); a bare `startsWith` disagrees
+  // with it, and then a tile and the recording it filed say different things about one folder.
+  const under = (f: string, root: string) => f === root || f.startsWith(root.replace(/\/$/, "") + "/");
+  const watching = (key: string) => { const r = rootOf(key); return r ? s.watched_folders.filter((f) => under(f, r.path)) : []; };
 
   const state = (id: SourceId): { tone: Tone; text: string } => {
     switch (id) {
@@ -97,8 +116,8 @@ export function SourcesView() {
       case "mic": return src.recording ? { tone: "live", text: "Recording" } : { tone: "idle", text: `${src.microphones.length} input${src.microphones.length === 1 ? "" : "s"}` };
       case "voicememos": return src.voice_memos.available ? { tone: "good", text: s.auto_import_voice_memos ? "Auto-import on" : "Connected" } : { tone: "warn", text: "Needs access" };
       case "omi": case "granola": case "notion": { const k = src.connectors[id]; return !k.configured ? { tone: "idle", text: "Not connected" } : k.last_error ? { tone: "warn", text: "Error" } : { tone: "good", text: `${c[id] ?? 0} imported` }; }
-      case "icloud": case "dropbox": case "googledrive": { const r = rootOf(id); const w = watching(id); return !r ? { tone: "idle", text: "Not on this Mac" } : w.length ? { tone: "good", text: `${w.length} folder${w.length === 1 ? "" : "s"}` } : { tone: "idle", text: "Available" }; }
-      case "folder": { const other = s.watched_folders.filter((f) => !["icloud", "dropbox", "googledrive"].some((k) => rootOf(k) && f.startsWith(rootOf(k)!.path))); return other.length ? { tone: "good", text: `${other.length} watched` } : { tone: "idle", text: "None yet" }; }
+      case "icloud": case "dropbox": case "googledrive": case "onedrive": case "zoom": { const r = rootOf(id); const w = watching(id); return !r ? { tone: "idle", text: "Not on this Mac" } : w.length ? { tone: "good", text: `${w.length} folder${w.length === 1 ? "" : "s"}` } : { tone: "idle", text: "Available" }; }
+      case "folder": { const other = s.watched_folders.filter((f) => !FOLDER_PLACES.some((k) => { const r = rootOf(k); return r && under(f, r.path); })); return other.length ? { tone: "good", text: `${other.length} watched` } : { tone: "idle", text: "None yet" }; }
       case "files": return { tone: "idle", text: c.file ? `${c.file} imported` : "Drop or choose" };
     }
   };
@@ -147,7 +166,7 @@ export function SourcesView() {
                 {open === "mic" && <MicPanel src={src} onChange={() => { mutate(); mutateStatus(); }} />}
                 {open === "voicememos" && <VoiceMemosPanel vm={src.voice_memos} auto={s.auto_import_voice_memos} onAuto={(v) => save({ auto_import_voice_memos: v })} onChange={() => mutate()} onRecheck={() => mutate()} />}
                 {(open === "omi" || open === "granola" || open === "notion") && <ConnectorPanel name={open} src={src} s={s} save={save} />}
-                {(open === "icloud" || open === "dropbox" || open === "googledrive" || open === "folder") && <FolderPanel kind={open} root={open === "folder" ? undefined : rootOf(open)} s={s} save={save} />}
+                {(open === "folder" || isFolderPlace(open)) && <FolderPanel kind={open} name={tile.name} hint={tile.hint} root={open === "folder" ? undefined : rootOf(open)} s={s} save={save} />}
                 {open === "files" && <FilesPanel />}
               </div>
             </>
@@ -341,15 +360,18 @@ function ConnectorPanel({ name, src, s, save }: { name: "omi" | "granola" | "not
   );
 }
 
-function FolderPanel({ kind, root, s, save }: { kind: string; root?: { key: string; label: string; path: string }; s: Settings; save: (p: Partial<Settings>, m?: string) => Promise<void> }) {
+function FolderPanel({ kind, name, hint, root, s, save }: { kind: string; name: string; hint?: React.ReactNode; root?: { key: string; label: string; path: string }; s: Settings; save: (p: Partial<Settings>, m?: string) => Promise<void> }) {
   const [path, setPath] = useState(root?.path ?? "");
   const { data: listing, error } = useSWR<{ path: string; parent: string | null; dirs: { name: string; path: string }[]; audio_files: number }>(path ? `/api/fs/list?path=${encodeURIComponent(path)}` : null, fetcher, { keepPreviousData: true });
   const watched = s.watched_folders;
   const isWatched = watched.includes(path);
-  if (kind !== "folder" && !root) return <p className="text-ink-2">{kind === "icloud" ? "iCloud Drive" : kind === "dropbox" ? "Dropbox" : "Google Drive"} is not set up on this Mac, so there is no folder to watch. Once it is, it appears here automatically.</p>;
+  // The tile's own name, not a list of them: a panel that has to be told about each new place is the thing that
+  // goes stale when one is added.
+  if (kind !== "folder" && !root) return <p className="text-ink-2">{name} has no folder on this Mac, so there is nothing to watch yet. Once it does, it appears here automatically.</p>;
   return (
     <div>
       <p className="text-ink-2">Pick the folder your recordings land in. New audio in it is copied into the library on every poll; the folder itself is never touched.</p>
+      {hint && <p className="mt-2.5 rounded-md border border-dashed border-hairline px-3 py-2 text-[12.5px] leading-snug text-ink-2">{hint}</p>}
       <div className="mt-3 flex gap-2">
         <Input value={path} onChange={(e) => setPath(e.target.value)} placeholder="~/Recordings" className="tc h-9 flex-1 bg-surface text-[12.5px]" />
         <Button variant="outline" onClick={() => openSys(`reveal:${path}`)} disabled={!path}>Show in Finder</Button>

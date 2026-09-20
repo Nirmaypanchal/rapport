@@ -6,6 +6,12 @@ All notable changes to Rapport. The format follows Keep a Changelog; versions fo
 
 ### Added
 
+- **Zoom, Google Meet and OneDrive are one click each.** Sources has a **Zoom** tile that opens at
+  `~/Documents/Zoom`, where Zoom saves the meetings you record to your Mac, and a **OneDrive** tile beside the other
+  synced folders. Watch the folder once and every later meeting is transcribed like any other recording, filed under
+  Zoom rather than as a generic watched folder — so it can have a summary template of its own. Google Meet writes
+  into **Meet Recordings** inside your Drive folder, which the Google Drive tile now points at.
+
 - **Sources are named by where a recording came from.** A watched folder inside iCloud Drive, Dropbox, Google Drive
   or OneDrive is now listed as that service rather than as a generic "watched folder", everywhere you pick a source:
   Settings → Template by source, the counts on the Sources page, and a recording's Details panel. Three watched

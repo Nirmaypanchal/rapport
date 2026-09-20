@@ -205,6 +205,7 @@ def create_app(library: Library, db: Database, importer: Importer, worker, recor
         "notion": ["/Applications/Notion.app", str(Path.home() / "Applications/Notion.app")],
         "omi": ["/Applications/Omi.app", str(Path.home() / "Applications/Omi.app")],
         "ollama": ["/Applications/Ollama.app"],
+        "zoom": ["/Applications/zoom.us.app", str(Path.home() / "Applications/zoom.us.app")],
     }
 
     @app.get("/api/brand/{key}.png")
@@ -270,7 +271,7 @@ def create_app(library: Library, db: Database, importer: Importer, worker, recor
 
     @app.get("/api/fs/roots")
     def fs_roots():
-        """Cloud-synced folders present on this Mac, for one-click watching.
+        """The folders on this Mac that are a place of their own, plus Downloads and Desktop, for one-click watching.
 
         The list itself lives in `rapport/sources.py`, because resolving which of these a watched folder belongs
         to is also how a recording is filed under a place — one list, so the page and the filing cannot disagree.
@@ -431,7 +432,7 @@ def create_app(library: Library, db: Database, importer: Importer, worker, recor
     def recordings():
         recs = db.list_recordings()
         spk = db.speakers_for_recordings()
-        roots = source_places.cloud_roots()  # asked once for the whole list, not once per recording
+        roots = source_places.place_roots()  # asked once for the whole list, not once per recording
         for r in recs:
             r["speakers"] = spk.get(r["id"], [])
             r["peaks_mini"] = _mini_peaks(r["id"]) if r["status"] == "done" else []

@@ -3,9 +3,9 @@
 Two vocabularies met in the middle of this app and did not match. The ``recordings.source`` column names the
 mechanism Rapport used to get a file — ``folder``, ``usb``, ``microphone``, ``file``, ``voicememos``, ``granola``
 — which is what import dedup and the connectors need, and must not change. The Sources page names *places*:
-``mic``, ``files``, ``icloud``, ``dropbox``, ``googledrive`` and a generic ``folder`` for everything else. A user
-choosing "a summary template for my iCloud recorder" is choosing a place, so anything offered next to that choice
-has to speak the second vocabulary (`sprint/decisions.md`, 2026-09-14).
+``mic``, ``files``, ``icloud``, ``dropbox``, ``googledrive``, ``onedrive``, ``zoom``, and a generic ``folder`` for
+everything else. A user choosing "a summary template for my iCloud recorder" is choosing a place, so anything
+offered next to that choice has to speak the second vocabulary (`sprint/decisions.md`, 2026-09-14).
 
 This module is the one translation between them. ``source_key`` maps a recording to the place it came from; three
 watched folders that all arrive as ``folder`` come out as the services that sync them, because the watched path is
@@ -31,13 +31,19 @@ def _present(cands: list[tuple[str, str, Path]]) -> list[dict]:
     return out
 
 
-def cloud_roots(home: Path | None = None) -> list[dict]:
-    """The cloud-synced folders present on this Mac: the places a watched folder can belong to.
+def place_roots(home: Path | None = None) -> list[dict]:
+    """The folders on this Mac that are a place of their own: the ones a watched folder can belong to.
 
-    A folder under one of these belongs to that service, however deep — the same rule `sources-view.tsx` uses
-    client-side to decide which tile a watched folder is listed under. OneDrive is in this list and has no tile of
-    its own yet, so its folders are still *managed* under the generic "watched folder" tile while their recordings
-    are *filed* under `onedrive`; naming the place a recording came from is right either way.
+    Two kinds of thing are here, and they earn their place the same way — a tile on the Sources page names them, so
+    a recording that arrives from one is worth filing under it rather than under a generic "watched folder". The
+    cloud services sync a folder (iCloud Drive, Dropbox, Google Drive, OneDrive); an app writes one (Zoom saves its
+    local recordings to ``~/Documents/Zoom``). A folder under any of these belongs to it however deep, which is the
+    same rule `sources-view.tsx` uses client-side to decide which tile a watched folder is listed under.
+
+    Order is resolution order, but the entries do not overlap: Zoom's folder is only Zoom's when the path really is
+    ``~/Documents/Zoom``. With Desktop & Documents syncing to iCloud, a path browsed in through the iCloud tile
+    (`…/CloudDocs/Documents/Zoom`) resolves to iCloud instead, which is what the user picked and what the Sources
+    page already lists it under.
     """
     home = home or Path.home()
     cands = [
@@ -45,6 +51,7 @@ def cloud_roots(home: Path | None = None) -> list[dict]:
         ("dropbox", "Dropbox", home / "Library/CloudStorage/Dropbox"),
         ("dropbox", "Dropbox", home / "Dropbox"),
         ("onedrive", "OneDrive", home / "Library/CloudStorage/OneDrive-Personal"),
+        ("zoom", "Zoom", home / "Documents/Zoom"),
     ]
     for g in sorted((home / "Library/CloudStorage").glob("GoogleDrive-*")):
         cands.insert(3, ("googledrive", "Google Drive", g / "My Drive"))
@@ -52,14 +59,14 @@ def cloud_roots(home: Path | None = None) -> list[dict]:
 
 
 def fs_roots(home: Path | None = None) -> list[dict]:
-    """What `GET /api/fs/roots` answers: the cloud folders above, then two ordinary places worth one click.
+    """What `GET /api/fs/roots` answers: the places above, then two ordinary folders worth one click.
 
-    Downloads and Desktop are shortcuts for the folder browser, not services — a recording watched out of
+    Downloads and Desktop are shortcuts for the folder browser, not places — a recording watched out of
     Downloads is still filed under the generic `folder` place, because there is no Downloads source to set
-    anything for.
+    anything for. That is the whole difference between the two lists: a tile, and a template you could set for it.
     """
     home = home or Path.home()
-    return cloud_roots(home) + _present([
+    return place_roots(home) + _present([
         ("downloads", "Downloads", home / "Downloads"),
         ("desktop", "Desktop", home / "Desktop"),
     ])
@@ -70,7 +77,7 @@ def source_key(source: str | None, source_volume: str | None = None, roots: list
 
     ``source_volume`` is the watched folder's own path for a ``folder`` import (`importer.py` stores it), which is
     what resolves the three-way tie between iCloud, Dropbox and Google Drive. Pass ``roots`` when resolving more
-    than one recording, so the filesystem is asked once rather than per row; leave it out and `cloud_roots()`
+    than one recording, so the filesystem is asked once rather than per row; leave it out and `place_roots()`
     answers. A folder under nothing in particular, or a row with no volume stored, stays the generic ``folder``.
 
     Rows written before the ``source`` column existed are NULL and are DJI mic files.
@@ -88,7 +95,7 @@ def _folder_place(source_volume: str | None, roots: list[dict] | None = None) ->
         p = Path(source_volume).expanduser()
     except (OSError, ValueError, RuntimeError):
         return "folder"
-    for r in (cloud_roots() if roots is None else roots):
+    for r in (place_roots() if roots is None else roots):
         # `is_relative_to` rather than a string prefix: "~/Dropbox Archive" is not inside "~/Dropbox".
         try:
             if p.is_relative_to(r["path"]):

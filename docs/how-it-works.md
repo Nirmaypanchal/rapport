@@ -70,7 +70,8 @@ your library actually holds recordings from; a source you leave alone uses the d
 picked a template for yourself keeps that one. Rapport sets none of these for you.
 
 Sources are named the way the **Sources** page names them — the place a recording came from, not the machinery that
-fetched it. A watched folder inside iCloud Drive, Dropbox or Google Drive is listed as that service, so three watched
+fetched it. A watched folder inside iCloud Drive, Dropbox, Google Drive, OneDrive or Zoom's own folder is listed as
+that place, so three watched
 folders are three sources you can set separately rather than one lump called "watched folder", and "a template for my
 iCloud recorder" is a thing you can say. Every recording's Details panel names the same place.
 
