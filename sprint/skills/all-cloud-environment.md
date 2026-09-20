@@ -1,4 +1,4 @@
-# The cloud environment (Last verified: 2026-09-18, Build)
+# The cloud environment (Last verified: 2026-09-20, retro week 38)
 
 - Linux, repository cloned at `/home/user/rapport`, Python 3.12 and Node available; the first `npm ci` takes about 30 s, `scripts/test-light.sh` about 10 s.
 - GitHub access: the run used the GitHub MCP tools (`mcp__github__create_pull_request`, `merge_pull_request`, `actions_list`,
@@ -8,11 +8,14 @@
 - **Pushing a branch works; deleting one does not.** `git push origin --delete <branch>` and `git push origin :<branch>` both
   return `RPC failed; HTTP 403` from this environment (2026-09-16, twice, on a branch this agent had just created), and no
   GitHub MCP tool deletes a ref. Anything that has to remove a branch belongs in a workflow, where the token can do it.
-- **GitHub access is scoped to `Nirmaypanchal/rapport` and nothing else.** Any other repository — including an action
+- **GitHub *API* access is scoped to `Nirmaypanchal/rapport` and nothing else.** Any other repository — including an action
   this project depends on — answers `GitHub access to this repository is not enabled for this session` (2026-09-18,
-  trying to read `actions/checkout`'s releases to find the current major). So a run cannot confirm an upstream version
-  from here: either leave it as a marked guess for the next run, or find the answer in something already vendored
-  (`node_modules/`, `uv.lock`). This applies to `curl` through the proxy as well as to the GitHub MCP tools.
+  trying to read `actions/checkout`'s releases to find the current major).
+  **This does not mean an upstream fact is unverifiable: `WebFetch` reads the same page over the open web.**
+  `WebFetch https://github.com/actions/checkout/releases` answers in one call (2026-09-20, retro: the current major is
+  **v7**, latest v7.0.1 — the board had recorded `@v5` as a marked guess because the API call failed). The rule: an API
+  tool being scoped is a fact about that tool, not about the world. Try the public page before writing "unverifiable
+  from here".
 - The public REST API answers without a token for this repository, which is how a script that normally calls `gh` can still be
   driven against real data here: point its `fetch` at `https://api.github.com/repos/Nirmaypanchal/rapport/…` and leave the
   side effects stubbed. That is what caught two wrong diagnoses of the ghost run on 2026-09-16.
@@ -31,5 +34,12 @@
   auto-merge — is in `sprint/skills/all-sprint-automation.md`. Read it before believing a red CI run.
 - **WebFetch reads public GitHub pages that no API tool here exposes** — Discussions, for one. Verified 2026-09-13. When
   an API is closed to you, try the public page before recording the gap as permanent; see `sprint/skills/community-listening.md`.
+- **reddit.com is blocked to every method here, not just to `curl`.** `curl` through the proxy gives
+  `CONNECT tunnel failed, response 403` and `WebFetch` answers `Claude Code is unable to fetch from www.reddit.com`
+  (both 2026-09-20). Two independent methods is enough — stop re-probing more than weekly, and note that this says
+  nothing about *posting*, which happens from a GitHub Action on a different network and fails only for want of
+  credentials (#3). See `sprint/skills/reddit.md`.
+- The routines the agents themselves run on — their triggers, why one goes silent, what they may push to — are in
+  `sprint/skills/all-routines.md`.
 - The GitHub MCP list tools accept a `fields` array. Use it: the default response includes every issue and PR body, and
   `actions_list` without a narrow `perPage` returns ~94 KB that will not fit in one read.

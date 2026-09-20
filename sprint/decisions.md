@@ -2,6 +2,21 @@
 
 Newest first. One paragraph each: what, why, what it rules out.
 
+- **2026-09-20 · A nightly failure blocks a release only while it stands.** Week 37 gave Release an expiry for a silent
+  nightly and sealed it with "never use this to skip a nightly that ran and *failed*". The only nightly that has ever run
+  failed, so the expiry could never fire: `2026-09-10-nightly.md` is permanently the newest log, and Release correctly
+  read the rule and held the tag on 09-11 and again on 09-18. That FAIL was a bug in `scripts/e2e.py`, not in Rapport —
+  named in the log, fixed the next day in [#9](https://github.com/Nirmaypanchal/rapport/pull/9), covered since by
+  `tests/test_e2e_harness.py`, and the same log reports the real pipeline passing twice on source and frozen builds. So a
+  failure is now **spent** — and does not block the seven-day expiry — when four things hold: its cause is named in the
+  log, a merged commit fixes that cause, a test would catch it returning, and that nightly reported the product itself
+  passing. Why: the gate exists to stop a bad build reaching users, and after twelve days it was stopping every build,
+  including nine features that CI runs green on real Apple silicon every push. Ruled out: treating any FAIL as spent
+  (a failure whose cause is unknown, unfixed, untested, or in the product blocks absolutely, with no clock); and
+  shipping quietly (the release notes must name every subsystem no Mac has executed). Also ruled out, deliberately: the
+  Retrospective cutting the tag itself. A published release is outward-facing and a tag is never rewritten; Release owns
+  that call, and a retro that does another agent's job instead of fixing its instructions has misunderstood the job.
+
 - **2026-09-16 · The merge deletes the one CI run it causes and that GitHub never runs.** `sprint-merge` opens its
   pull request with `GITHUB_TOKEN`, and GitHub does not run workflows for events that token creates: the run is filed
   `action_required` with zero jobs, and the squash-merge's branch deletion turns it red. Every auto-merge left one,

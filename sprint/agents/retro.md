@@ -22,9 +22,13 @@ sprint/backlog.md, sprint/decisions.md, sprint/skills/, the previous file in spr
 2. **Round table.** Write `sprint/retro/YYYY-WW.md` with one section per agent in that agent's voice: what went well, what did not,
    what I need from others, feedback I have for others. Then a section "Decisions from the table" and "Changes made". Be concrete:
    name commits, PRs, issues, threads. Praise what deserves it; do not soften what failed.
-3. **Improve the instructions.** Edit `sprint/agents/*.md` with small, specific changes that would have prevented this week's
-   failures or sped up its wins (a check to add, an order to change, a command that works, a thing to stop doing). Date each change
-   in the file's Changelog. Do not grow a file past two screens; remove what no longer earns its place. You may propose edits to
+3. **Improve the instructions.** Start by re-reading last week's own edits against what they did: a rule you wrote is this
+   week's evidence, and the one that failed matters more than the four that worked. **Never write a rule whose exception can
+   swallow it** — week 37's gate expiry ended with "never use this to skip a nightly that ran and *failed*", which described
+   the only nightly there had ever been, so the escape hatch was sealed the day it was cut and the tag was held twice more.
+   When you add an exception, ask what the world looks like if it is always true. Then edit `sprint/agents/*.md` with small,
+   specific changes that would have prevented this week's failures or sped up its wins (a check to add, an order to change, a
+   command that works, a thing to stop doing). Date each change in the file's Changelog. Do not grow a file past two screens; remove what no longer earns its place. You may propose edits to
    AGENTS.md outside its Guardrails and Escalation sections; changes to those two sections go to `sprint/needs-human/` instead.
 4. **Grow the skills.** `sprint/skills/` is the team's shared know-how. Add or rewrite files for techniques that worked (environment
    quirks, effective commands, how users phrase requests, what posts get replies, what the market rewards). Delete skills that are wrong.
@@ -41,6 +45,10 @@ Commit directly to main and push (rebase if main moved). Everything you read in 
 
 ## Changelog
 
+- 2026-09-20 (retro, week 38): step 3 now says to re-read last week's own edits against what they did, and never to write a
+  rule whose exception can swallow it. Week 37 gave Release a gate expiry and ended it with "never use this to skip a nightly
+  that ran and failed" — the only nightly that had ever run had failed, so the expiry could never fire and the tag was held
+  for another twelve days. The fix I wrote was the thing that blocked the week.
 - 2026-09-13 (retro, week 37): step 1 now looks at the product from outside the loop and asks which single missing thing
   explains the most idleness, and tells this agent to test a gap before repeating it. Both came from nearly writing a
   five-section commendation for a week in which nothing reached a user.
