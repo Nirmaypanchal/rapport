@@ -65,8 +65,9 @@ Details: [docs/how-it-works.md](docs/how-it-works.md).
 | Apple Voice Memos (Mac, iPhone, Apple Watch via iCloud) | Granola |
 | AirPods and any Bluetooth or USB microphone | Notion AI Meeting Notes |
 | iPhone as a microphone via Continuity | Omi pendant |
-| DJI Mic Mini, Mic 2, Mic 3 and other USB-mounted recorders | iCloud Drive, Dropbox, Google Drive folders |
-| Zoom, Tascam, Sony recorders and SD cards | Otter, Plaud, Pocket and other exports (drop the files) |
+| DJI Mic Mini, Mic 2, Mic 3 and other USB-mounted recorders | Zoom and Google Meet, from the folders they record into |
+| Tascam, Sony, Zoom H-series recorders and SD cards | iCloud Drive, Dropbox, Google Drive, OneDrive folders |
+| Any SD card or drive with audio files on it | Otter, Plaud, Pocket and other exports (drop the files) |
 
 Missing yours? [Open a device request](https://github.com/Nirmaypanchal/rapport/issues/new?template=device_request.md)
 or add a connector: [docs/developers.md](docs/developers.md).

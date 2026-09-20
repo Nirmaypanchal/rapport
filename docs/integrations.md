@@ -13,7 +13,9 @@ reads reaches it.
 | **Granola** | Notes, transcripts (with "me/others" speakers) and Granola's summary | API key from the Granola desktop app (`grn_…`) |
 | **Notion AI Meeting Notes** | Pages containing the meeting-notes block, as transcript text | Internal integration token; optionally a database ID to limit the scan |
 | **Omi** | Conversations with transcript segments, overview and action items | Developer API key from the Omi app (`omi_dev_…`) |
-| **iCloud Drive, Dropbox, Google Drive** | Any audio file that lands in a folder you watch | Nothing; Rapport finds the synced folders on your Mac |
+| **Zoom** | Every meeting you record to this Mac, from the folder Zoom saves them in | Nothing; record with **Record on this Computer** |
+| **Google Meet** | Recorded calls, from **Meet Recordings** in your Drive folder | Google Drive syncing to this Mac |
+| **iCloud Drive, Dropbox, Google Drive, OneDrive** | Any audio file that lands in a folder you watch | Nothing; Rapport finds the synced folders on your Mac |
 | **Any folder** | Same, for a folder you choose | Nothing |
 | **Exports** (Otter, Plaud, Pocket, Zoom cloud recordings, WhatsApp voice notes…) | Whatever you drop on the Recordings list | Nothing |
 
@@ -36,9 +38,26 @@ Keys are stored in `settings.json` inside your library folder.
 1. In the Omi app: Developer → API keys → create a key with read access to conversations.
 2. Sources → Omi → paste → **Connect**.
 
+### Zoom
+1. In Zoom, record with **Record** → **Record on this Computer**. Zoom writes one folder per meeting into
+   `~/Documents/Zoom` when the call ends. (A cloud recording leaves nothing on your Mac; download it and drop it on the
+   Recordings list instead.)
+2. Sources → Zoom opens at that folder. Click **Watch this folder** once.
+3. Every later meeting is copied in, transcribed and speaker-tagged on the next poll — one watch covers all of them,
+   since Zoom's per-meeting subfolders are searched too. Rapport imports audio files, so it takes the `.m4a` Zoom
+   writes for a meeting and ignores the `.mp4` video beside it; the folder itself is never written to or cleared.
+
+Because Zoom is a source of its own, Settings → Template by source can give your Zoom calls the meeting template while a
+voice memo keeps the journal one.
+
+### Google Meet
+Meet saves what it records to **Meet Recordings** inside your Google Drive. With Drive syncing to this Mac, Sources →
+Google Drive → browse into `Meet Recordings` → **Watch this folder** brings in every recorded call. There is nothing to
+install: it is the Drive folder you already have.
+
 ### Cloud folders
-Sources → iCloud Drive / Dropbox / Google Drive shows the synced root; browse to the folder your phone recorder saves to and
-click **Watch this folder**. New audio is copied in on every poll.
+Sources → iCloud Drive / Dropbox / Google Drive / OneDrive shows the synced root; browse to the folder your phone recorder
+saves to and click **Watch this folder**. New audio is copied in on every poll.
 
 ## MCP server: your recordings inside Claude, Cursor or any MCP client
 

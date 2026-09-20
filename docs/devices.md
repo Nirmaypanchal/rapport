@@ -20,7 +20,8 @@ This page lists what's supported, how each one connects, and how to add one that
 | Plaud Note, Plaud NotePin | Export audio from the Plaud app, drop the files, or watch the export folder | Via export |
 | Pocket AI recorder | Export from the Pocket app, drop the files | Via export |
 | Limitless Pendant, Bee | Export from their apps, drop the files | Via export |
-| Android phones (Recorder app, Samsung Voice Recorder) | Sync the folder to iCloud Drive/Dropbox/Google Drive and watch it | Via folder |
+| Android phones (Recorder app, Samsung Voice Recorder) | Sync the folder to iCloud Drive/Dropbox/Google Drive/OneDrive and watch it | Via folder |
+| Zoom and Google Meet calls you record | Watch the folder each saves local recordings to; see [Integrations](integrations.md#zoom) | Via folder |
 | Rode Wireless GO/PRO, Hollyland Lark | On-board recording mounts over USB; switch on in Sources | Supported (generic recorder) |
 
 ## How detection works

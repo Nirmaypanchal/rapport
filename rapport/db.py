@@ -7,7 +7,7 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .sources import cloud_roots, source_key
+from .sources import place_roots, source_key
 
 SCHEMA = """
 PRAGMA journal_mode=WAL;
@@ -576,7 +576,7 @@ class Database:
         Three watched folders all carry ``source='folder'``, so the group-by asks for the volume too and the
         counts are folded in Python: two of them may be one iCloud place and the third a Dropbox one.
         """
-        roots = cloud_roots()
+        roots = place_roots()
         out: dict[str, int] = {}
         rows = self.connect().execute("SELECT source, source_volume, COUNT(*) FROM recordings GROUP BY source, source_volume")
         for source, volume, n in rows:

@@ -201,6 +201,26 @@ def test_fs_roots_lists_what_is_on_this_mac(library, db, tmp_path, monkeypatch):
     assert [(r["key"], r["label"]) for r in roots] == [("icloud", "iCloud Drive"), ("desktop", "Desktop")]
     assert roots[0]["path"] == str(tmp_path / "Library/Mobile Documents/com~apple~CloudDocs")
 
+    # An app's own folder is a root too, so its tile opens at it: Zoom saves local recordings to ~/Documents/Zoom.
+    (tmp_path / "Documents/Zoom").mkdir(parents=True)
+    zoom = [r for r in _client(library, db).get("/api/fs/roots").json() if r["key"] == "zoom"]
+    assert zoom == [{"key": "zoom", "label": "Zoom", "path": str(tmp_path / "Documents/Zoom")}]
+
+
+def test_a_zoom_meeting_is_filed_under_zoom_not_under_watched_folder(library, db, tmp_path, monkeypatch):
+    # Zoom writes one folder per meeting; watching ~/Documents/Zoom brings every one of them in, and they are filed
+    # under the tile the user set the folder up from, so a Zoom-only summary template is expressible.
+    (tmp_path / "Documents/Zoom/2026-09-20 10.00.00 Standup").mkdir(parents=True)
+    monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+    # `source_volume` is the *watched* folder, and `audio_files` recurses, so one watch covers every meeting folder.
+    db.insert_recording(sha256="1" * 64, original_name="a.m4a", rel_path="audio/a.m4a", source="folder", source_volume=str(tmp_path / "Documents/Zoom"))
+    db.insert_recording(sha256="2" * 64, original_name="b.m4a", rel_path="audio/b.m4a", source="folder", source_volume=str(tmp_path / "Elsewhere"))
+    c = _client(library, db)
+
+    places = {r["original_name"]: r["source_place"] for r in c.get("/api/recordings").json()}
+    assert places == {"a.m4a": "zoom", "b.m4a": "folder"}
+    assert dict((s["id"], s["count"]) for s in c.get("/api/summary/templates").json()["sources"]) == {"zoom": 1, "folder": 1}
+
 
 def test_the_sources_offered_are_places_not_the_mechanism_column(library, db, tmp_path, monkeypatch):
     """Settings offers a row per *place*, which is what the user picked on the Sources page.
