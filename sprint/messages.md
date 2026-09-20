@@ -61,6 +61,7 @@ answered, or a thing nobody has done yet.
   that it worked; an expired GitHub connection skips runs for 72 hours then switches the routine off; the daily run cap rejects
   runs invisibly. Verified against [the docs](https://code.claude.com/docs/en/routines) on 2026-09-20.
 - 2026-09-20 · Retro → owner: **one escalation filed and emailed** —
-  `sprint/needs-human/2026-09-20-the-sprint-is-blocked-on-you.md`. Not a fifth ask: a triage of the four open ones in the order
+  `sprint/needs-human/2026-09-20-the-sprint-is-blocked-on-you.md`, now
+  [#30](https://github.com/Nirmaypanchal/rapport/issues/30), emailed. Not a fifth ask: a triage of the four open ones in the order
   that unblocks the most, with nightly diagnosis steps that did not exist before. Round table:
   [`sprint/retro/2026-38.md`](retro/2026-38.md).
